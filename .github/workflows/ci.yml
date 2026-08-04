@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema:
+    name: Schema + conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install lxml
+        run: pip install --no-cache-dir lxml
+
+      - name: Schema compiles
+        run: |
+          python3 - <<'PY'
+          from lxml import etree
+          etree.XMLSchema(etree.parse('schema/v1.0/harnessxml-1.0.xsd'))
+          print('XSD compiles')
+          PY
+
+      # Every example is also a conformance fixture, so an example cannot rot
+      # without CI noticing. This is the gate that keeps the docs honest.
+      - name: Conformance suite
+        run: python3 conformance/validate.py -v
+
+  site:
+    name: Site build + link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # No `pip install` step on purpose. site/build.py is standard library
+      # only, and a build that needs dependencies is a build that stops working
+      # the year one of them is yanked.
+      - name: Build (fails on a broken internal link)
+        run: python3 site/build.py --check
+
+      - name: Assert required artifacts exist
+        run: |
+          set -e
+          for f in site/public/index.html \
+                   site/public/404.html \
+                   site/public/sitemap.xml \
+                   site/public/robots.txt \
+                   site/public/search-index.json \
+                   site/public/schema/v1.0/harnessxml-1.0.xsd \
+                   site/public/spec/v1.0/index.html; do
+            test -s "$f" || { echo "missing or empty: $f"; exit 1; }
+          done
+          echo "all required artifacts present"
+
+      # A released spec version is immutable (governance §4). If a file under a
+      # released spec/ or schema/ directory changes in a PR, that is a policy
+      # violation, not a normal edit — errata are appended, never inlined.
+      - name: Released versions are immutable
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD || true)
+          VIOLATION=0
+          for f in $CHANGED; do
+            case "$f" in
+              spec/v*/*|schema/v*/*)
+                # v1.0 is still DRAFT and therefore editable. Add released
+                # versions here as they freeze.
+                case "$f" in
+                  spec/v1.0/*|schema/v1.0/*) ;;
+                  *) echo "::error file=$f::$f belongs to a RELEASED version and must not be modified. Publish a dated erratum instead."; VIOLATION=1 ;;
+                esac ;;
+            esac
+          done
+          exit $VIOLATION
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site/public
+          retention-days: 7
+
+  runtime:
+    name: Reference runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: reference-runtime
+
+      - name: Format
+        working-directory: reference-runtime
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: reference-runtime
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        working-directory: reference-runtime
+        run: cargo test
+
+      # The point of the reference implementation is that every normative rule
+      # has running code behind it — so it must pass the same suite third
+      # parties are asked to pass.
+      - name: Conformance suite against the reference validator
+        working-directory: reference-runtime
+        run: |
+          cargo build --release
+          cd ..
+          python3 conformance/validate.py --cmd "reference-runtime/target/release/harnessxml validate" -v
+
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The specification forbids literal credentials in documents (HX-3501).
+      # It would be embarrassing to leak one in the repository that defines the
+      # rule, so the repo is scanned with the same seriousness.
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo audit
+        working-directory: reference-runtime
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit

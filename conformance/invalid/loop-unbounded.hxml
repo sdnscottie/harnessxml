@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HX-1001: the loop omits maxIterations. There is no unbounded form — an
+     unbounded loop in an unattended workflow is a defect, not a feature. -->
+<harness xmlns="https://harnessxml.com/spec/1.0" id="unbounded" specVersion="1.0">
+  <nodes>
+    <node id="l" type="loop">
+      <loop kind="while" while="${true}">
+        <body ref="w"/>
+      </loop>
+    </node>
+    <node id="w" type="task" impl="work"/>
+  </nodes>
+</harness>

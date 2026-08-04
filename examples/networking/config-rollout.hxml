@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HarnessXML 1.0 reference example — network automation.
+
+  A staged configuration rollout across a fleet of switches. What this example
+  is really about is the JOIN POLICY: the canary phase releases on a quorum
+  rather than on every device, because waiting for a device that is already
+  wedged is how a rollout window gets missed.
+
+  It also shows the pattern that makes network automation survivable:
+  every device push has a compensating rollback, and the rollback is declared
+  in the workflow rather than living in an engineer's memory at 02:00.
+
+  Copyright 2026 VisML. SPDX-License-Identifier: Apache-2.0
+-->
+<harness xmlns="https://harnessxml.com/spec/1.0"
+         id="config_rollout"
+         specVersion="1.0"
+         name="Staged switch configuration rollout"
+         entry="load_intent">
+
+  <metadata>
+    <title>Staged switch configuration rollout</title>
+    <description>Validates a configuration intent, canaries it on a subset of
+      switches, gates on health, then rolls out to the fleet — with a declared
+      rollback for every push.</description>
+    <author>VisML</author>
+    <created>2026-08-04T09:00:00Z</created>
+    <license>Apache-2.0</license>
+    <tags>
+      <tag>networking</tag>
+      <tag>automation</tag>
+      <tag>canary</tag>
+    </tags>
+  </metadata>
+
+  <security classification="restricted"/>
+
+  <resources>
+    <resource id="netbox" type="datastore" name="Source of truth" provider="netbox"
+              uri="https://netbox.internal/api">
+      <credential ref="NETBOX_TOKEN" store="vault"/>
+    </resource>
+
+    <resource id="fleet" type="service" name="Switch fleet API" provider="netconf">
+      <description>NETCONF gateway fronting the switch fleet.</description>
+      <property name="port" value="830"/>
+      <property name="timeoutSeconds" value="30"/>
+      <credential ref="NETCONF_KEY" store="vault"/>
+    </resource>
+
+    <resource id="metrics" type="service" name="Metrics" provider="prometheus"
+              uri="http://prometheus.internal:9090"/>
+  </resources>
+
+  <artifacts>
+    <artifact id="intent" type="config" name="Desired configuration"
+              uri="git://config-repo/intents/vlan-segmentation.yaml"
+              mediaType="application/yaml"
+              digest="sha256:4b1e8d0f2a6c9e3517b8d2f0a4c6e8103b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5"
+              classification="restricted"/>
+  </artifacts>
+
+  <nodes>
+
+    <node id="load_intent" type="source" name="Load intent" impl="net.intent.load">
+      <outputs>
+        <output name="config" type="yaml"/>
+        <output name="targets" type="array&lt;string&gt;"/>
+      </outputs>
+      <resourceRef ref="netbox" role="datastore"/>
+      <artifactRef ref="intent" direction="in"/>
+    </node>
+
+    <node id="validate_intent" type="transform" name="Validate intent"
+          impl="net.intent.validate">
+      <description>Static validation before anything is touched. Pure, so it is
+        retryable and its verdict is cacheable against the intent digest.</description>
+      <inputs>
+        <input name="config" type="yaml"/>
+      </inputs>
+      <outputs>
+        <output name="ok" type="boolean"/>
+        <output name="diagnostics" type="array&lt;string&gt;"/>
+      </outputs>
+      <retry maxAttempts="2" backoff="fixed" initialDelay="PT1S"/>
+    </node>
+
+    <node id="gate_valid" type="decision" name="Intent valid?">
+      <cases>
+        <case when="${validate_intent.ok}" to="select_canaries"/>
+        <otherwise to="abort"/>
+      </cases>
+    </node>
+
+    <node id="select_canaries" type="transform" name="Select canary devices"
+          impl="net.rollout.select_canaries">
+      <inputs>
+        <input name="targets" type="array&lt;string&gt;"/>
+        <input name="fraction" type="number" value="0.1"/>
+      </inputs>
+      <outputs>
+        <output name="canaries" type="array&lt;string&gt;"/>
+        <output name="remainder" type="array&lt;string&gt;"/>
+      </outputs>
+    </node>
+
+    <node id="canary_push" type="loop" name="Push to canaries">
+      <description>Runs canary devices concurrently, but bounded — eight at a
+        time, so a bad config cannot hit the whole canary set at once.</description>
+      <loop kind="forEach"
+            over="${select_canaries.canaries}"
+            var="device"
+            maxIterations="64"
+            maxConcurrency="8"
+            onItemFailure="continue">
+        <body ref="push_device"/>
+      </loop>
+    </node>
+
+    <node id="push_device" type="task" name="Push config to device"
+          impl="net.device.push" idempotent="true">
+      <description>Idempotent because NETCONF edit-config with the same intent
+        converges to the same state — which is what makes retry safe here and
+        not safe in the robotics example.</description>
+      <inputs>
+        <input name="device" type="string" value="${device}"/>
+        <input name="config" type="yaml"/>
+      </inputs>
+      <outputs>
+        <output name="applied" type="boolean"/>
+        <output name="previousConfig" type="yaml"/>
+      </outputs>
+      <resourceRef ref="fleet" role="service"/>
+      <retry maxAttempts="3" backoff="exponential" initialDelay="PT2S" maxDelay="PT20S"
+             retryOn="transient timeout"/>
+      <timeout duration="PT1M" onTimeout="retry"/>
+      <security classification="restricted" principal="netops-automation"/>
+    </node>
+
+    <node id="rollback_device" type="task" name="Roll back device"
+          impl="net.device.restore"
+          idempotent="true"
+          compensates="push_device">
+      <description>The declared rollback. Restores the config captured on the
+        way in, so the undo path is part of the design rather than a runbook.</description>
+      <inputs>
+        <input name="device" type="string" value="${device}"/>
+        <input name="config" type="yaml" value="${push_device.previousConfig}"/>
+      </inputs>
+      <resourceRef ref="fleet" role="service"/>
+      <retry maxAttempts="5" backoff="exponential" initialDelay="PT1S"/>
+    </node>
+
+    <node id="soak" type="wait" name="Soak canaries">
+      <description>Let the canaries run long enough for a problem to surface.</description>
+      <wait duration="PT10M"/>
+    </node>
+
+    <node id="health_check" type="task" name="Check canary health"
+          impl="net.health.evaluate" idempotent="true">
+      <inputs>
+        <input name="devices" type="array&lt;string&gt;"/>
+        <input name="window" type="string" value="PT10M"/>
+      </inputs>
+      <outputs>
+        <output name="healthy" type="integer"/>
+        <output name="total" type="integer"/>
+        <output name="errorRate" type="number"/>
+      </outputs>
+      <resourceRef ref="metrics" role="service"/>
+      <retry maxAttempts="3" backoff="fixed" initialDelay="PT5S"/>
+    </node>
+
+    <node id="canary_gate" type="barrier" name="Canary quorum gate"
+          joinPolicy="quorum" quorum="2">
+      <description>Releases once two of its incoming edges are satisfied rather
+        than all of them — a rollout should not be held hostage by one switch
+        that is already unreachable for unrelated reasons.</description>
+    </node>
+
+    <node id="promote_decision" type="decision" name="Promote to fleet?">
+      <cases>
+        <case when="${health_check.errorRate &lt;= 0.01}" to="fleet_push"/>
+        <otherwise to="rollback_all"/>
+      </cases>
+    </node>
+
+    <node id="fleet_push" type="loop" name="Push to remaining fleet">
+      <loop kind="forEach"
+            over="${select_canaries.remainder}"
+            var="device"
+            maxIterations="2048"
+            maxConcurrency="24"
+            onItemFailure="break">
+        <body ref="push_device"/>
+      </loop>
+    </node>
+
+    <node id="rollback_all" type="loop" name="Roll back canaries">
+      <loop kind="forEach"
+            over="${select_canaries.canaries}"
+            var="device"
+            maxIterations="64"
+            maxConcurrency="8"
+            onItemFailure="continue">
+        <body ref="rollback_device"/>
+      </loop>
+    </node>
+
+    <node id="record" type="sink" name="Record outcome" impl="net.audit.record">
+      <inputs>
+        <input name="intentDigest" type="string" value="${artifact('intent').digest}"/>
+      </inputs>
+      <resourceRef ref="netbox" role="datastore"/>
+    </node>
+
+    <node id="abort" type="sink" name="Abort rollout" impl="net.rollout.abort">
+      <inputs>
+        <input name="diagnostics" type="array&lt;string&gt;"/>
+      </inputs>
+    </node>
+
+  </nodes>
+
+  <edges>
+    <edge id="n_cfg"    from="load_intent"      to="validate_intent" type="data" fromPort="config"  toPort="config"/>
+    <edge id="n_gate"   from="validate_intent"  to="gate_valid"      type="control"/>
+    <edge id="n_diag"   from="validate_intent"  to="abort"           type="data" fromPort="diagnostics" toPort="diagnostics"/>
+    <edge id="n_tgts"   from="load_intent"      to="select_canaries" type="data" fromPort="targets" toPort="targets"/>
+
+    <edge id="n_can"    from="select_canaries"  to="canary_push"     type="control"/>
+    <edge id="n_pcfg"   from="load_intent"      to="push_device"     type="data" fromPort="config"  toPort="config"/>
+
+    <edge id="n_soak"   from="canary_push"      to="soak"            type="control"/>
+    <edge id="n_hc"     from="soak"             to="health_check"    type="control"/>
+    <edge id="n_hcd"    from="select_canaries"  to="health_check"    type="data" fromPort="canaries" toPort="devices"/>
+
+    <edge id="n_bar1"   from="health_check"     to="canary_gate"     type="control"/>
+    <edge id="n_bar2"   from="canary_push"      to="canary_gate"     type="dependency"/>
+    <edge id="n_bar3"   from="soak"             to="canary_gate"     type="dependency"/>
+
+    <edge id="n_prom"   from="canary_gate"      to="promote_decision" type="control"/>
+
+    <edge id="n_done1"  from="fleet_push"       to="record"          type="control"/>
+    <edge id="n_done2"  from="rollback_all"     to="record"          type="control"/>
+
+    <edge id="n_comp"   from="push_device"      to="rollback_device" type="compensation"/>
+  </edges>
+
+</harness>

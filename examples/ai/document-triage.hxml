@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HarnessXML 1.0 reference example — AI orchestration.
+
+  An incoming document is classified by a model, and the workflow branches on
+  the model's own confidence: high confidence auto-files, low confidence goes
+  to a human. The interesting part is not the model call — it is that the
+  escalation path is part of the DESIGN rather than an exception handler
+  someone remembered to write.
+
+  Copyright 2026 VisML. SPDX-License-Identifier: Apache-2.0
+-->
+<harness xmlns="https://harnessxml.com/spec/1.0"
+         id="document_triage"
+         specVersion="1.0"
+         name="Document triage with confidence-gated escalation"
+         entry="receive">
+
+  <metadata>
+    <title>Document triage with confidence-gated escalation</title>
+    <description>Classifies an inbound document, files it automatically when the
+      model is confident, and routes it to a human reviewer when it is not.</description>
+    <author>VisML</author>
+    <created>2026-08-04T09:00:00Z</created>
+    <license>Apache-2.0</license>
+    <tags>
+      <tag>ai</tag>
+      <tag>orchestration</tag>
+      <tag>human-in-the-loop</tag>
+    </tags>
+    <provenance>
+      <generator name="RuMima Enterprise Studio" version="1.0" vendor="VisML"/>
+    </provenance>
+  </metadata>
+
+  <security classification="confidential"/>
+
+  <resources>
+    <resource id="classifier" type="model" name="Document classifier" provider="anthropic">
+      <description>Vision-capable model used for both OCR and classification.</description>
+      <property name="model" value="claude-opus-5"/>
+      <property name="maxTokens" value="4096"/>
+      <property name="temperature" value="0"/>
+      <credential ref="ANTHROPIC_API_KEY" store="gcp-secret-manager"/>
+    </resource>
+
+    <resource id="records" type="datastore" name="Document store" provider="postgres"
+              uri="postgresql://records.internal/documents">
+      <credential ref="RECORDS_DSN" store="gcp-secret-manager"/>
+    </resource>
+
+    <resource id="review_queue" type="queue" name="Human review queue" provider="pubsub">
+      <property name="topic" value="projects/visml/topics/doc-review"/>
+    </resource>
+  </resources>
+
+  <artifacts>
+    <artifact id="taxonomy" type="config" name="Classification taxonomy"
+              uri="gs://visml-config/taxonomy-v3.json"
+              mediaType="application/json"
+              digest="sha256:9f2c1b7ae4d0c8135e6a0b4f7c2d9e18a3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2"/>
+  </artifacts>
+
+  <nodes>
+
+    <node id="receive" type="source" name="Receive document" impl="visml.intake.receive">
+      <description>Boundary node. Emits one document per invocation.</description>
+      <outputs>
+        <output name="document" type="binary">
+          <description>Raw uploaded bytes.</description>
+        </output>
+        <output name="filename" type="string"/>
+      </outputs>
+    </node>
+
+    <node id="extract_text" type="transform" name="Extract text" impl="visml.ocr.extract">
+      <description>Pure function of the document bytes, so it is freely retryable
+        and its result is cacheable by digest.</description>
+      <inputs>
+        <input name="document" type="binary"/>
+      </inputs>
+      <outputs>
+        <output name="text" type="string"/>
+        <output name="pageCount" type="integer"/>
+      </outputs>
+      <retry maxAttempts="3" backoff="exponential" initialDelay="PT2S" maxDelay="PT30S"/>
+      <timeout duration="PT2M" onTimeout="fail"/>
+    </node>
+
+    <node id="classify" type="inference" name="Classify document">
+      <description>Returns a category from the taxonomy plus the model's own
+        confidence. The confidence is what the next node branches on.</description>
+      <inputs>
+        <input name="text" type="string"/>
+        <input name="taxonomy" type="json" value="${artifact('taxonomy')}"/>
+      </inputs>
+      <outputs>
+        <output name="category" type="string"/>
+        <output name="confidence" type="number"/>
+        <output name="rationale" type="string"/>
+      </outputs>
+      <config>
+        <property name="systemPrompt" value="Classify the document into exactly one taxonomy category. Report calibrated confidence in [0,1]."/>
+        <property name="responseFormat" value="json"/>
+      </config>
+      <resourceRef ref="classifier" role="model"/>
+      <artifactRef ref="taxonomy" direction="in"/>
+      <retry maxAttempts="4" backoff="exponential" initialDelay="PT1S" maxDelay="PT1M"
+             retryOn="rate_limit transient"/>
+      <timeout duration="PT3M" onTimeout="retry"/>
+      <security classification="confidential"/>
+    </node>
+
+    <node id="route" type="decision" name="Confident enough to auto-file?">
+      <description>Cases are evaluated in document order; the first true case wins.</description>
+      <cases>
+        <case when="${classify.confidence &gt;= 0.90}" to="auto_file"/>
+        <case when="${classify.confidence &gt;= 0.60}" to="human_review"/>
+        <otherwise to="quarantine"/>
+      </cases>
+    </node>
+
+    <node id="auto_file" type="task" name="File automatically"
+          impl="visml.records.file" idempotent="true">
+      <inputs>
+        <input name="category" type="string"/>
+        <input name="text" type="string"/>
+      </inputs>
+      <outputs>
+        <output name="recordId" type="string"/>
+      </outputs>
+      <resourceRef ref="records" role="datastore"/>
+      <retry maxAttempts="3" backoff="linear" initialDelay="PT1S"/>
+    </node>
+
+    <node id="human_review" type="human" name="Human review"
+          impl="visml.review.request" idempotent="false">
+      <description>Blocks until a reviewer decides. idempotent="false" stops a
+        runtime from silently enqueueing a second review on retry.</description>
+      <inputs>
+        <input name="text" type="string"/>
+        <input name="suggestedCategory" type="string"/>
+        <input name="rationale" type="string" required="false"/>
+      </inputs>
+      <outputs>
+        <output name="category" type="string"/>
+        <output name="reviewer" type="string"/>
+      </outputs>
+      <resourceRef ref="review_queue" role="queue"/>
+      <timeout duration="P1D" onTimeout="fail"/>
+    </node>
+
+    <node id="file_reviewed" type="task" name="File reviewer decision"
+          impl="visml.records.file">
+      <inputs>
+        <input name="category" type="string"/>
+        <input name="text" type="string"/>
+      </inputs>
+      <outputs>
+        <output name="recordId" type="string"/>
+      </outputs>
+      <resourceRef ref="records" role="datastore"/>
+    </node>
+
+    <node id="quarantine" type="sink" name="Quarantine" impl="visml.records.quarantine">
+      <description>Reached when the model is not confident enough to be worth a
+        reviewer's time. A terminal, deliberate outcome — not an error.</description>
+      <inputs>
+        <input name="text" type="string"/>
+        <input name="reason" type="string" value="classification confidence below review threshold"/>
+      </inputs>
+      <resourceRef ref="records" role="datastore"/>
+    </node>
+
+    <node id="notify_failure" type="sink" name="Notify on failure"
+          impl="visml.alerting.page">
+      <description>Target of the error edge from classify. Reached only after
+        every retry is exhausted.</description>
+      <inputs>
+        <input name="stage" type="string" value="classify"/>
+      </inputs>
+    </node>
+
+  </nodes>
+
+  <edges>
+    <edge id="e_doc"      from="receive"      to="extract_text" type="data" fromPort="document" toPort="document"/>
+    <edge id="e_text"     from="extract_text" to="classify"     type="data" fromPort="text"     toPort="text"/>
+    <edge id="e_route"    from="classify"     to="route"        type="control"/>
+
+    <edge id="e_auto_txt" from="extract_text" to="auto_file"    type="data" fromPort="text"     toPort="text"/>
+    <edge id="e_auto_cat" from="classify"     to="auto_file"    type="data" fromPort="category" toPort="category"/>
+
+    <edge id="e_hr_text"  from="extract_text" to="human_review" type="data" fromPort="text"     toPort="text"/>
+    <edge id="e_hr_cat"   from="classify"     to="human_review" type="data" fromPort="category" toPort="suggestedCategory"/>
+    <edge id="e_hr_why"   from="classify"     to="human_review" type="data" fromPort="rationale" toPort="rationale"/>
+
+    <edge id="e_fr_cat"   from="human_review" to="file_reviewed" type="data" fromPort="category" toPort="category"/>
+    <edge id="e_fr_text"  from="extract_text" to="file_reviewed" type="data" fromPort="text"     toPort="text"/>
+
+    <edge id="e_q_text"   from="extract_text" to="quarantine"   type="data" fromPort="text"     toPort="text"/>
+
+    <edge id="e_err"      from="classify"     to="notify_failure" type="error">
+      <description>Traversed only when classify reaches FAILED after retries.</description>
+    </edge>
+  </edges>
+
+</harness>

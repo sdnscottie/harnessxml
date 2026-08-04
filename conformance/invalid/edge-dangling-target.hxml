@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HX-2001: edge 'e1' targets a node that does not exist. Caught by the schema
+     via xs:keyref, so a plain schema-validating parser rejects it. -->
+<harness xmlns="https://harnessxml.com/spec/1.0" id="dangling" specVersion="1.0">
+  <nodes>
+    <node id="a" type="task" impl="noop"/>
+  </nodes>
+  <edges>
+    <edge id="e1" from="a" to="nonexistent" type="control"/>
+  </edges>
+</harness>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HX-3003: a -> b -> a. Repetition must be expressed with a loop node, which
+     carries a required bound; a cycle would allow unbounded repetition that no
+     validator can detect. Layer 2: not catchable by the schema. -->
+<harness xmlns="https://harnessxml.com/spec/1.0" id="cyclic" specVersion="1.0">
+  <nodes>
+    <node id="a" type="task" impl="noop"/>
+    <node id="b" type="task" impl="noop"/>
+  </nodes>
+  <edges>
+    <edge from="a" to="b" type="control"/>
+    <edge from="b" to="a" type="control"/>
+  </edges>
+</harness>

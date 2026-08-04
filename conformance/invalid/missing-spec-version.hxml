@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HX-1002: no specVersion. A runtime cannot safely guess which semantics
+     apply, and guessing wrong is worse than refusing. -->
+<harness xmlns="https://harnessxml.com/spec/1.0" id="noversion">
+  <nodes>
+    <node id="a" type="task" impl="noop"/>
+  </nodes>
+</harness>

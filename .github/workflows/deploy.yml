@@ -1,0 +1,95 @@
+name: Deploy harnessxml.com
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'spec/**'
+      - 'schema/**'
+      - 'examples/**'
+      - 'GOVERNANCE.md'
+      - 'CONTRIBUTING.md'
+      - 'CODE_OF_CONDUCT.md'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write        # Workload Identity Federation — no long-lived key
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false   # never interrupt a deploy mid-upload
+
+env:
+  PROJECT_ID: agrarobotics-licensing
+  BUCKET: harnessxml-web
+  URLMAP: rumima-urlmap
+
+jobs:
+  deploy:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build (fails on a broken internal link)
+        run: python3 site/build.py --check
+
+      - name: Sanity-check the build before it goes anywhere
+        run: |
+          set -e
+          test -s site/public/index.html
+          test -s site/public/404.html
+          test -s site/public/sitemap.xml
+          test -s site/public/schema/v1.0/harnessxml-1.0.xsd
+          # A near-empty build would otherwise happily replace the live site.
+          COUNT=$(find site/public -name '*.html' | wc -l)
+          echo "$COUNT pages"
+          test "$COUNT" -ge 25 || { echo "only $COUNT pages — refusing to deploy a truncated site"; exit 1; }
+
+      # Workload Identity Federation rather than a service-account key file.
+      # A long-lived key in repository secrets is the thing that leaks.
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload site
+        run: |
+          gcloud storage rsync -r -d site/public "gs://${BUCKET}" \
+            --cache-control="public, max-age=300"
+
+      - name: Cache policy — released schemas are immutable, so cache for a year
+        run: |
+          gcloud storage objects update "gs://${BUCKET}/assets/**" \
+            --cache-control="public, max-age=86400"
+          gcloud storage objects update "gs://${BUCKET}/schema/**" \
+            --cache-control="public, max-age=31536000, immutable"
+          gcloud storage objects update "gs://${BUCKET}/examples-src/**" \
+            --cache-control="public, max-age=3600"
+
+      - name: Invalidate CDN
+        run: gcloud compute url-maps invalidate-cdn-cache "${URLMAP}" --path="/*" --async
+
+      - name: Verify the live site
+        run: |
+          set -e
+          sleep 15
+          code() { curl -s -o /dev/null -w '%{http_code}' "$1"; }
+          test "$(code https://harnessxml.com/)" = "200"
+          test "$(code https://harnessxml.com/spec/v1.0/)" = "200"
+          test "$(code https://harnessxml.com/schema/v1.0/harnessxml-1.0.xsd)" = "200"
+          # A missing page must be a real 404, not the homepage with a 200.
+          test "$(code https://harnessxml.com/definitely-not-a-page/)" = "404"
+          echo "live site verified"

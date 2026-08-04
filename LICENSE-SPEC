@@ -1,0 +1,79 @@
+HarnessXML Open Specification — Licence
+=======================================
+
+The HarnessXML Specification text is licensed under the
+
+    Creative Commons Attribution 4.0 International Licence (CC BY 4.0)
+
+    SPDX-License-Identifier: CC-BY-4.0
+    Canonical text: https://creativecommons.org/licenses/by/4.0/legalcode
+    Human-readable summary: https://creativecommons.org/licenses/by/4.0/
+
+Copyright 2026 VisML.
+
+
+What this covers
+----------------
+
+The specification TEXT and the prose of this website:
+
+    spec/**            the versioned specification chapters
+    site/content/**    the published documentation pages
+
+Code, schemas and examples are licensed separately under the Apache License,
+Version 2.0 — see LICENSE-CODE. Where the two overlap (a code sample embedded
+in a specification chapter), the sample is available under Apache-2.0.
+
+
+What you may do
+---------------
+
+Anything, including commercially, provided you give attribution:
+
+  * copy and redistribute the specification in any medium or format
+  * translate it into other languages
+  * quote it in your own documentation, papers, RFCs or standards
+  * build derivative specifications and profiles on top of it
+  * implement it — no permission needed, no royalty, no notification
+
+You may not apply legal terms or technological measures that legally restrict
+others from doing anything the licence permits.
+
+
+Attribution
+-----------
+
+Reasonable attribution looks like:
+
+    "HarnessXML Specification, created and stewarded by VisML,
+     used under CC BY 4.0. https://harnessxml.com/"
+
+Indicate if you made changes. If you publish a modified or derived
+specification, say so plainly and do not imply that VisML endorses it.
+
+
+Trademarks are NOT licensed
+---------------------------
+
+"HarnessXML", "VisML" and "RuMima" are names, not part of the copyright grant.
+Neither CC BY 4.0 nor Apache-2.0 grants trademark rights.
+
+  * You MAY say your software "implements HarnessXML" or "supports HarnessXML".
+  * You MAY NOT name your product in a way that implies it is the official
+    HarnessXML implementation, or that VisML produced or endorsed it.
+  * Use of a conformance badge requires passing the published conformance
+    suite — see conformance/ and GOVERNANCE.md.
+
+
+Why this licence
+----------------
+
+A specification only becomes a standard if a competitor can implement it
+without asking permission. CC BY 4.0 is the weakest condition under which
+VisML's authorship still has to be acknowledged: it permits commercial use,
+derivatives and redistribution, and asks for credit in return. It is the
+same posture taken by the specifications HarnessXML means to stand alongside.
+
+No patent grant is made or implied by this licence over the specification
+text; the patent grant that matters attaches to the reference implementation
+under Apache-2.0 (see LICENSE-CODE, section 3).

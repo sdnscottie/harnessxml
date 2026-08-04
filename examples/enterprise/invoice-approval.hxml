@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HarnessXML 1.0 reference example — enterprise business process automation.
+
+  Invoice intake through to payment. The point of interest is the SECURITY and
+  PROVENANCE model: an invoice workflow is the kind of thing an auditor reads
+  back two years later, so every node declares what it may touch, and the
+  document records what generated it and from which design.
+
+  It also shows a guard (conditional execution of a single node) as distinct
+  from a decision node (routing between alternatives) — the two are constantly
+  confused, and they behave differently.
+
+  Copyright 2026 VisML. SPDX-License-Identifier: Apache-2.0
+-->
+<harness xmlns="https://harnessxml.com/spec/1.0"
+         id="invoice_approval"
+         specVersion="1.0"
+         name="Invoice intake, approval and payment"
+         entry="intake">
+
+  <metadata>
+    <title>Invoice intake, approval and payment</title>
+    <description>Extracts invoice fields, matches them against the purchase
+      order, routes for approval by value, and releases payment.</description>
+    <author>VisML</author>
+    <organization>VisML</organization>
+    <created>2026-08-04T09:00:00Z</created>
+    <license>Apache-2.0</license>
+    <documentVersion>3</documentVersion>
+    <tags>
+      <tag>enterprise</tag>
+      <tag>finance</tag>
+      <tag>approval</tag>
+    </tags>
+    <provenance>
+      <generator name="RuMima Enterprise Studio" version="1.0" vendor="VisML"/>
+      <source uri="rmmx://finance/invoice-approval.rmmx"
+              type="visual-graph"
+              digest="sha256:1a2b3c4d5e6f708192a3b4c5d6e7f80911223344556677889900aabbccddeeff"/>
+    </provenance>
+  </metadata>
+
+  <security classification="confidential" principal="ap-automation"/>
+
+  <resources>
+    <resource id="extractor" type="model" name="Invoice field extractor" provider="anthropic">
+      <property name="model" value="claude-opus-5"/>
+      <property name="temperature" value="0"/>
+      <credential ref="ANTHROPIC_API_KEY" store="vault"/>
+    </resource>
+
+    <resource id="erp" type="service" name="ERP" provider="erpnext"
+              uri="https://erp.internal/api">
+      <credential ref="ERP_TOKEN" store="vault"/>
+    </resource>
+
+    <resource id="ledger" type="datastore" name="General ledger" provider="postgres">
+      <credential ref="LEDGER_DSN" store="vault"/>
+    </resource>
+
+    <resource id="payments" type="service" name="Payment rail" provider="sepa">
+      <credential ref="PAYMENT_CERT" store="vault"/>
+    </resource>
+  </resources>
+
+  <artifacts>
+    <artifact id="invoice_pdf" type="document" name="Inbound invoice"
+              mediaType="application/pdf"
+              classification="confidential"/>
+    <artifact id="audit_log" type="log" name="Approval audit trail"
+              uri="gs://visml-audit/invoices/"
+              mediaType="application/jsonl"
+              classification="restricted"/>
+  </artifacts>
+
+  <nodes>
+
+    <node id="intake" type="source" name="Receive invoice" impl="ap.intake.mailbox">
+      <outputs>
+        <output name="document" type="binary"/>
+        <output name="sender" type="string"/>
+      </outputs>
+      <artifactRef ref="invoice_pdf" direction="out"/>
+      <security classification="confidential"/>
+    </node>
+
+    <node id="extract_fields" type="inference" name="Extract invoice fields">
+      <inputs>
+        <input name="document" type="binary"/>
+      </inputs>
+      <outputs>
+        <output name="supplier" type="string"/>
+        <output name="poNumber" type="string" required="false"/>
+        <output name="amount" type="number"/>
+        <output name="currency" type="string"/>
+        <output name="dueDate" type="date"/>
+      </outputs>
+      <config>
+        <property name="responseFormat" value="json"/>
+        <property name="schema" value="invoice-v2"/>
+      </config>
+      <resourceRef ref="extractor" role="model"/>
+      <artifactRef ref="invoice_pdf" direction="in"/>
+      <retry maxAttempts="4" backoff="exponential" initialDelay="PT2S" maxDelay="PT1M"
+             retryOn="rate_limit transient"/>
+      <timeout duration="PT3M" onTimeout="retry"/>
+      <security classification="confidential">
+        <permission action="read" resource="artifact:invoice_pdf"/>
+      </security>
+    </node>
+
+    <node id="match_po" type="task" name="Match purchase order"
+          impl="ap.erp.match_po" idempotent="true">
+      <description>A GUARD, not a decision. If there is no PO number the node is
+        SKIPPED — a terminal SUCCESSFUL state — and its control successors still
+        run. A decision node would instead have to route somewhere.</description>
+      <inputs>
+        <input name="poNumber" type="string"/>
+        <input name="amount" type="number"/>
+      </inputs>
+      <outputs>
+        <output name="matched" type="boolean"/>
+        <output name="variance" type="number"/>
+      </outputs>
+      <resourceRef ref="erp" role="service"/>
+      <guard when="${extract_fields.poNumber != null}"/>
+      <retry maxAttempts="3" backoff="exponential" initialDelay="PT1S"/>
+      <security>
+        <permission action="read" resource="erp:purchase_orders"/>
+      </security>
+    </node>
+
+    <node id="route_approval" type="decision" name="Route by value">
+      <description>Approval authority by amount. Cases in document order, first
+        true wins — so the thresholds read top-down like the policy they encode.</description>
+      <cases>
+        <case when="${extract_fields.amount &gt; 50000}" to="director_approval"/>
+        <case when="${extract_fields.amount &gt; 5000}" to="manager_approval"/>
+        <case when="${match_po.matched and match_po.variance &lt;= 0.02}" to="auto_approve"/>
+        <otherwise to="clerk_review"/>
+      </cases>
+    </node>
+
+    <node id="auto_approve" type="task" name="Auto-approve" impl="ap.approve.auto">
+      <description>Reached only for a PO-matched invoice within 2% variance and
+        under the manager threshold.</description>
+      <outputs>
+        <output name="approvedBy" type="string"/>
+      </outputs>
+      <resourceRef ref="ledger" role="datastore"/>
+    </node>
+
+    <node id="clerk_review" type="human" name="Clerk review"
+          impl="ap.approve.request" idempotent="false">
+      <outputs>
+        <output name="approvedBy" type="string"/>
+        <output name="approved" type="boolean"/>
+      </outputs>
+      <timeout duration="P3D" onTimeout="fail"/>
+    </node>
+
+    <node id="manager_approval" type="human" name="Manager approval"
+          impl="ap.approve.request" idempotent="false">
+      <outputs>
+        <output name="approvedBy" type="string"/>
+        <output name="approved" type="boolean"/>
+      </outputs>
+      <timeout duration="P3D" onTimeout="fail"/>
+    </node>
+
+    <node id="director_approval" type="human" name="Director approval"
+          impl="ap.approve.request" idempotent="false">
+      <description>High-value invoices need a second pair of eyes and a longer
+        window, because the approver is more likely to be travelling.</description>
+      <outputs>
+        <output name="approvedBy" type="string"/>
+        <output name="approved" type="boolean"/>
+      </outputs>
+      <timeout duration="P5D" onTimeout="fail"/>
+    </node>
+
+    <node id="approval_gate" type="barrier" name="Any approval received"
+          joinPolicy="any">
+      <description>joinPolicy="any" — exactly one approval path is ever taken,
+        so the barrier releases on the first and cancels nothing real.</description>
+    </node>
+
+    <node id="post_ledger" type="task" name="Post to ledger"
+          impl="ap.ledger.post" idempotent="false">
+      <description>Not idempotent: posting the same invoice twice is a double
+        entry. A runtime MUST NOT auto-retry, which is why no retry policy is
+        declared here even though every other node has one.</description>
+      <inputs>
+        <input name="amount" type="number"/>
+        <input name="supplier" type="string"/>
+      </inputs>
+      <outputs>
+        <output name="entryId" type="string"/>
+      </outputs>
+      <resourceRef ref="ledger" role="datastore"/>
+      <security>
+        <permission action="write" resource="ledger:accounts_payable"/>
+      </security>
+    </node>
+
+    <node id="reverse_entry" type="task" name="Reverse ledger entry"
+          impl="ap.ledger.reverse"
+          idempotent="true"
+          compensates="post_ledger">
+      <description>Compensation for a posted entry when payment later fails.
+        A reversal, not a delete — the original entry stays in the audit trail.</description>
+      <inputs>
+        <input name="entryId" type="string" value="${post_ledger.entryId}"/>
+      </inputs>
+      <resourceRef ref="ledger" role="datastore"/>
+    </node>
+
+    <node id="pay" type="task" name="Release payment"
+          impl="ap.payments.release" idempotent="false">
+      <inputs>
+        <input name="amount" type="number"/>
+        <input name="currency" type="string"/>
+        <input name="dueDate" type="date"/>
+      </inputs>
+      <outputs>
+        <output name="paymentRef" type="string"/>
+      </outputs>
+      <resourceRef ref="payments" role="service"/>
+      <timeout duration="PT2M" onTimeout="fail"/>
+      <security classification="restricted" principal="ap-payments">
+        <permission action="execute" resource="payments:sepa_transfer"/>
+      </security>
+    </node>
+
+    <node id="audit" type="sink" name="Write audit trail" impl="ap.audit.append">
+      <resourceRef ref="ledger" role="datastore"/>
+      <artifactRef ref="audit_log" direction="out"/>
+      <security classification="restricted">
+        <permission action="append" resource="artifact:audit_log"/>
+      </security>
+    </node>
+
+    <node id="reject" type="sink" name="Reject invoice" impl="ap.intake.reject">
+      <inputs>
+        <input name="reason" type="string" value="approval declined or extraction failed"/>
+      </inputs>
+    </node>
+
+  </nodes>
+
+  <edges>
+    <edge id="i_doc"   from="intake"            to="extract_fields"    type="data" fromPort="document" toPort="document"/>
+    <edge id="i_po"    from="extract_fields"    to="match_po"          type="data" fromPort="poNumber" toPort="poNumber"/>
+    <edge id="i_amt"   from="extract_fields"    to="match_po"          type="data" fromPort="amount"   toPort="amount"/>
+    <edge id="i_route" from="match_po"          to="route_approval"    type="control"/>
+
+    <edge id="i_a1"    from="auto_approve"      to="approval_gate"     type="control"/>
+    <edge id="i_a2"    from="clerk_review"      to="approval_gate"     type="control" condition="${clerk_review.approved}"/>
+    <edge id="i_a3"    from="manager_approval"  to="approval_gate"     type="control" condition="${manager_approval.approved}"/>
+    <edge id="i_a4"    from="director_approval" to="approval_gate"     type="control" condition="${director_approval.approved}"/>
+
+    <edge id="i_post"  from="approval_gate"     to="post_ledger"       type="control"/>
+    <edge id="i_pamt"  from="extract_fields"    to="post_ledger"       type="data" fromPort="amount"   toPort="amount"/>
+    <edge id="i_psup"  from="extract_fields"    to="post_ledger"       type="data" fromPort="supplier" toPort="supplier"/>
+
+    <edge id="i_pay"   from="post_ledger"       to="pay"               type="control"/>
+    <edge id="i_yamt"  from="extract_fields"    to="pay"               type="data" fromPort="amount"   toPort="amount"/>
+    <edge id="i_ycur"  from="extract_fields"    to="pay"               type="data" fromPort="currency" toPort="currency"/>
+    <edge id="i_ydue"  from="extract_fields"    to="pay"               type="data" fromPort="dueDate"  toPort="dueDate"/>
+
+    <edge id="i_aud"   from="pay"               to="audit"             type="control"/>
+
+    <edge id="i_comp"  from="post_ledger"       to="reverse_entry"     type="compensation"/>
+    <edge id="i_e1"    from="pay"               to="reverse_entry"     type="error"/>
+    <edge id="i_e2"    from="extract_fields"    to="reject"            type="error"/>
+  </edges>
+
+</harness>

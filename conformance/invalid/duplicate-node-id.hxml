@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HX-1101: two nodes share the id 'a'. Every reference to 'a' would be
+     ambiguous, so the document is rejected rather than resolved by a rule. -->
+<harness xmlns="https://harnessxml.com/spec/1.0" id="dup" specVersion="1.0">
+  <nodes>
+    <node id="a" type="task" impl="noop"/>
+    <node id="a" type="task" impl="noop"/>
+  </nodes>
+</harness>

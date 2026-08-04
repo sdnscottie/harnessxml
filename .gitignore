@@ -1,0 +1,31 @@
+# Rust
+/reference-runtime/target
+**/*.rs.bk
+
+# Generated site — rebuilt by `python3 site/build.py`, never committed.
+# Committing it would let the published site and its source drift apart.
+/site/public/
+
+# Rendered diagrams — regenerate with drawio --export
+docs_about__harnessxml/*.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# NEVER commit these. The specification forbids literal credentials in
+# documents (HX-3501); it would be embarrassing to leak one in the repository
+# that defines the rule.
+*.pem
+*.key
+*-key.json
+service-account*.json
+.env
+.env.*

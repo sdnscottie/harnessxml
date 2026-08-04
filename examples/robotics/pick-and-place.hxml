@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HarnessXML 1.0 reference example — robotics.
+
+  A vision-guided pick-and-place cell working through a bin of parts. It shows
+  the three things that separate a robotics workflow from a data pipeline:
+
+    * a bounded loop  — maxIterations is REQUIRED, because an unattended arm
+                        that loops forever is a safety problem, not a bug
+    * compensation    — if placement fails after the part has been grasped, the
+                        arm must PUT IT BACK, not simply report failure
+    * non-idempotence — you cannot "retry" a physical grasp the way you retry
+                        an HTTP call
+
+  Copyright 2026 VisML. SPDX-License-Identifier: Apache-2.0
+-->
+<harness xmlns="https://harnessxml.com/spec/1.0"
+         id="pick_and_place"
+         specVersion="1.0"
+         name="Vision-guided bin picking"
+         entry="calibrate">
+
+  <metadata>
+    <title>Vision-guided bin picking</title>
+    <description>Detects parts in a bin, picks each one and places it on a
+      conveyor, compensating a failed placement by returning the part.</description>
+    <author>VisML</author>
+    <created>2026-08-04T09:00:00Z</created>
+    <license>Apache-2.0</license>
+    <tags>
+      <tag>robotics</tag>
+      <tag>edge</tag>
+      <tag>compensation</tag>
+    </tags>
+  </metadata>
+
+  <security classification="internal" isolation="process"/>
+
+  <resources>
+    <resource id="arm" type="device" name="6-axis arm" provider="ur">
+      <description>Collaborative arm on the cell controller.</description>
+      <property name="endpoint" value="rtde://192.168.10.21:30004"/>
+      <property name="payloadKg" value="5"/>
+      <property name="toolFrame" value="tcp_gripper"/>
+    </resource>
+
+    <resource id="camera" type="device" name="Bin camera" provider="basler">
+      <property name="endpoint" value="gige://192.168.10.31"/>
+      <property name="resolution" value="2448x2048"/>
+    </resource>
+
+    <resource id="detector" type="model" name="Grasp pose detector">
+      <description>On-device model. Runs at the edge so the cell keeps working
+        when the uplink does not.</description>
+      <property name="runtime" value="onnx"/>
+      <property name="device" value="npu0"/>
+      <property name="modelUri" value="file:///opt/models/graspnet-v4.onnx"/>
+    </resource>
+
+    <resource id="telemetry" type="service" name="Cell telemetry" provider="otlp">
+      <property name="endpoint" value="http://collector.cell.local:4317"/>
+    </resource>
+  </resources>
+
+  <nodes>
+
+    <node id="calibrate" type="task" name="Calibrate hand-eye"
+          impl="cell.calib.handeye" idempotent="true">
+      <description>Runs once at start of shift. Everything downstream depends on it.</description>
+      <outputs>
+        <output name="transform" type="matrix4x4"/>
+      </outputs>
+      <resourceRef ref="arm" role="device"/>
+      <resourceRef ref="camera" role="device"/>
+      <retry maxAttempts="2" backoff="fixed" initialDelay="PT5S"/>
+      <timeout duration="PT2M" onTimeout="fail"/>
+    </node>
+
+    <node id="scan_bin" type="task" name="Scan bin" impl="cell.vision.capture">
+      <inputs>
+        <input name="transform" type="matrix4x4"/>
+      </inputs>
+      <outputs>
+        <output name="cloud" type="pointcloud"/>
+      </outputs>
+      <resourceRef ref="camera" role="device"/>
+      <retry maxAttempts="3" backoff="fixed" initialDelay="PT1S"/>
+    </node>
+
+    <node id="detect_grasps" type="inference" name="Detect grasp poses">
+      <inputs>
+        <input name="cloud" type="pointcloud"/>
+      </inputs>
+      <outputs>
+        <output name="grasps" type="array&lt;pose6d&gt;"/>
+      </outputs>
+      <config>
+        <property name="minScore" value="0.55"/>
+        <property name="maxCandidates" value="24"/>
+      </config>
+      <resourceRef ref="detector" role="model"/>
+      <timeout duration="PT10S" onTimeout="fail"/>
+    </node>
+
+    <node id="pick_cycle" type="loop" name="Pick every detected part">
+      <description>One iteration per detected grasp. Sequential by design —
+        maxConcurrency stays 1 because there is exactly one arm.</description>
+      <loop kind="forEach"
+            over="${detect_grasps.grasps}"
+            var="grasp"
+            indexVar="i"
+            maxIterations="24"
+            maxConcurrency="1"
+            onItemFailure="continue">
+        <body ref="grasp_part"/>
+      </loop>
+    </node>
+
+    <node id="grasp_part" type="task" name="Grasp part"
+          impl="cell.motion.grasp" idempotent="false">
+      <description>Physically closes the gripper. idempotent="false" — a runtime
+        MUST NOT silently retry this, because a second attempt on an already-held
+        part is a collision, not a retry.</description>
+      <inputs>
+        <input name="pose" type="pose6d" value="${grasp}"/>
+      </inputs>
+      <outputs>
+        <output name="held" type="boolean"/>
+        <output name="gripWidth" type="number"/>
+      </outputs>
+      <resourceRef ref="arm" role="device"/>
+      <timeout duration="PT20S" onTimeout="fail"/>
+      <security isolation="process"/>
+    </node>
+
+    <node id="verify_grip" type="task" name="Verify grip" impl="cell.sensing.gripcheck">
+      <inputs>
+        <input name="expectedWidth" type="number"/>
+      </inputs>
+      <outputs>
+        <output name="ok" type="boolean"/>
+      </outputs>
+      <resourceRef ref="arm" role="device"/>
+    </node>
+
+    <node id="grip_ok" type="decision" name="Grip holding?">
+      <cases>
+        <case when="${verify_grip.ok}" to="place_part"/>
+        <otherwise to="release_and_rescan"/>
+      </cases>
+    </node>
+
+    <node id="place_part" type="task" name="Place on conveyor"
+          impl="cell.motion.place" idempotent="false">
+      <inputs>
+        <input name="target" type="pose6d" value="${config.conveyorDropPose}"/>
+      </inputs>
+      <outputs>
+        <output name="placed" type="boolean"/>
+      </outputs>
+      <resourceRef ref="arm" role="device"/>
+      <timeout duration="PT20S" onTimeout="fail"/>
+    </node>
+
+    <node id="return_part" type="task" name="Return part to bin"
+          impl="cell.motion.return_to_bin"
+          idempotent="false"
+          compensates="place_part">
+      <description>THE COMPENSATION. If placement fails while the part is still
+        in the gripper, the arm must put it back before the cell can continue.
+        Reachable only along the compensation edge — never during forward flow.</description>
+      <resourceRef ref="arm" role="device"/>
+      <timeout duration="PT30S" onTimeout="fail"/>
+    </node>
+
+    <node id="release_and_rescan" type="task" name="Release and rescan"
+          impl="cell.motion.open_gripper" idempotent="true">
+      <description>Grip verification failed, so nothing is held — safe to just
+        open and let the next iteration re-detect.</description>
+      <resourceRef ref="arm" role="device"/>
+    </node>
+
+    <node id="report" type="sink" name="Report cycle" impl="cell.telemetry.emit">
+      <inputs>
+        <input name="picked" type="integer" required="false"/>
+      </inputs>
+      <resourceRef ref="telemetry" role="service"/>
+    </node>
+
+    <node id="estop" type="task" name="Emergency stop"
+          impl="cell.safety.estop" idempotent="true">
+      <description>Error target for any motion failure. Deliberately reachable
+        from several nodes: a robot cell needs one obvious place that everything
+        broken leads to.</description>
+      <resourceRef ref="arm" role="device"/>
+    </node>
+
+  </nodes>
+
+  <edges>
+    <edge id="r_cal"    from="calibrate"     to="scan_bin"           type="data" fromPort="transform" toPort="transform"/>
+    <edge id="r_cloud"  from="scan_bin"      to="detect_grasps"      type="data" fromPort="cloud"     toPort="cloud"/>
+    <edge id="r_loop"   from="detect_grasps" to="pick_cycle"         type="control"/>
+
+    <edge id="r_grip"   from="grasp_part"    to="verify_grip"        type="data" fromPort="gripWidth" toPort="expectedWidth"/>
+    <edge id="r_check"  from="verify_grip"   to="grip_ok"            type="control"/>
+
+    <edge id="r_rescan" from="release_and_rescan" to="scan_bin"      type="dependency">
+      <description>Dependency rather than control: satisfied by ANY terminal
+        state, because a failed release still needs a rescan.</description>
+    </edge>
+
+    <edge id="r_done"   from="pick_cycle"    to="report"             type="control"/>
+
+    <edge id="r_comp"   from="place_part"    to="return_part"        type="compensation">
+      <description>Traversed backwards when place_part fails with the part held.</description>
+    </edge>
+
+    <edge id="r_e1"     from="grasp_part"    to="estop"              type="error"/>
+    <edge id="r_e2"     from="place_part"    to="estop"              type="error"/>
+    <edge id="r_e3"     from="calibrate"     to="estop"              type="error"/>
+  </edges>
+
+</harness>

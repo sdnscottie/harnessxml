@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HX-3301: a retry policy on a node the author declared non-idempotent. The
+     combination is a contradiction — retrying a capture charges twice — so it
+     is unrepresentable rather than merely discouraged. Layer 2: not catchable
+     by the schema. -->
+<harness xmlns="https://harnessxml.com/spec/1.0" id="badretry" specVersion="1.0">
+  <nodes>
+    <node id="capture" type="task" impl="pay.capture" idempotent="false">
+      <retry maxAttempts="3" backoff="exponential"/>
+    </node>
+  </nodes>
+</harness>
