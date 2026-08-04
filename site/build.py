@@ -603,8 +603,7 @@ def page_html(page: Page, pages: list[Page], prev: Page | None, nxt: Page | None
 <header class="site-header">
   <div class="header-inner">
     <a class="brand" href="/">
-      <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
-      <span class="brand-text">{SITE_NAME}</span>
+      <span class="b-harness">Harness</span><span class="b-xml">XML</span>
     </a>
     <button class="nav-toggle" aria-expanded="false" aria-controls="sidebar" aria-label="Toggle navigation">
       <span aria-hidden="true">☰</span>

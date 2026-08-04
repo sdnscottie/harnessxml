@@ -1,19 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HarnessXML">
+  <!-- visml.com house palette: --ground #0a1215, --structure #7fb8c4, --signal #f0b04e -->
   <style>
-    .bg { fill: #10508c; }
-    .fg { fill: none; stroke: #ffffff; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
-    .dot { fill: #ffffff; }
-    @media (prefers-color-scheme: dark) {
-      .bg { fill: #7fb6ef; }
-      .fg { stroke: #0f1216; }
-      .dot { fill: #0f1216; }
+    .bg   { fill: #0a1215; }
+    .edge { stroke: #7fb8c4; }
+    .node { fill: #7fb8c4; }
+    .lit  { fill: #f0b04e; }
+    @media (prefers-color-scheme: light) {
+      .bg   { fill: #f2f6f5; }
+      .edge { stroke: #2c6a7a; }
+      .node { fill: #2c6a7a; }
+      .lit  { fill: #a86a10; }
     }
   </style>
-  <rect class="bg" width="64" height="64" rx="13"/>
-  <!-- a workflow graph: one source fanning into two, joining at a sink -->
-  <path class="fg" d="M17 32 L30 19 M17 32 L30 45 M30 19 L47 32 M30 45 L47 32"/>
-  <circle class="dot" cx="17" cy="32" r="5.5"/>
-  <circle class="dot" cx="30" cy="19" r="4.5"/>
-  <circle class="dot" cx="30" cy="45" r="4.5"/>
-  <circle class="dot" cx="47" cy="32" r="5.5"/>
+  <rect class="bg" width="64" height="64"/>
+  <!-- a workflow: one source fanning into two, joining at a sink -->
+  <g class="edge" fill="none" stroke-width="3.5" stroke-linecap="square">
+    <path d="M17 32 L30 19 M17 32 L30 45 M30 19 L47 32 M30 45 L47 32"/>
+  </g>
+  <circle class="node" cx="17" cy="32" r="5"/>
+  <circle class="node" cx="30" cy="19" r="4"/>
+  <circle class="node" cx="30" cy="45" r="4"/>
+  <!-- the terminal node carries the signal colour, as visml.com lights its mark -->
+  <circle class="lit" cx="47" cy="32" r="5.5"/>
 </svg>
