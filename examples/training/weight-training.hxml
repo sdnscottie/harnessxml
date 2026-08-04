@@ -156,8 +156,8 @@
       <resourceRef ref="bar_tracker" role="device"/>
       <resourceRef ref="coach_app" role="service"/>
       <timeout duration="PT30M" onTimeout="fail"/>
-      <extension namespace="https://visml.com/harness/training/1" required="false">
-        <tr:prescription xmlns:tr="https://visml.com/harness/training/1"
+      <extension namespace="https://visml.com/harnessxml/training/1" required="false">
+        <tr:prescription xmlns:tr="https://visml.com/harnessxml/training/1"
                          scheme="rpe" targetRpe="8" cluster="false"/>
       </extension>
     </node>
