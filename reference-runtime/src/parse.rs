@@ -13,6 +13,7 @@
 use crate::diag::{Diagnostic, Diagnostics};
 use crate::model::*;
 use quick_xml::NsReader;
+use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 
@@ -40,7 +41,21 @@ impl Lines {
 fn attr(e: &BytesStart, key: &str) -> Option<String> {
     for a in e.attributes().flatten() {
         if a.key.local_name().into_inner() == key.as_bytes() {
-            return Some(a.unescape_value().ok()?.into_owned());
+            // normalized_value() replaced the deprecated unescape_value() in
+            // quick-xml 0.41. It additionally applies XML attribute-value
+            // normalisation (tab/newline/CR collapse to spaces), which is what
+            // the XML specification requires and what an XSD validator will
+            // already have assumed — so the two validation layers now agree.
+            //
+            // XML 1.0 is asserted: HarnessXML documents are XML 1.0, and 1.1
+            // differs here (it normalises NEL and LINE SEPARATOR too). Passing
+            // a fixed version rather than sniffing the declaration keeps
+            // normalisation identical whether or not a document carries one.
+            return Some(
+                a.normalized_value(XmlVersion::Explicit1_0)
+                    .ok()?
+                    .into_owned(),
+            );
         }
     }
     None

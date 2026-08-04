@@ -12,7 +12,7 @@ name = "harnessxml"
 path = "src/main.rs"
 
 [dependencies]
-quick-xml = "0.37"
+quick-xml = "0.41"
 
 [profile.release]
 opt-level = 2
