@@ -2,6 +2,11 @@
 
 **The Open Specification for Executable Intelligent System Workflows.**
 
+[![CI](https://github.com/sdnscottie/harnessxml/actions/workflows/ci.yml/badge.svg)](https://github.com/sdnscottie/harnessxml/actions/workflows/ci.yml)
+[![Spec text: CC BY 4.0](https://img.shields.io/badge/spec-CC%20BY%204.0-blue)](LICENSE-SPEC)
+[![Code: Apache 2.0](https://img.shields.io/badge/code-Apache%202.0-blue)](LICENSE-CODE)
+[![Specification](https://img.shields.io/badge/spec-v1.0%20draft-orange)](https://harnessxml.com/spec/v1.0/)
+
 [harnessxml.com](https://harnessxml.com/) · Specification text
 [CC BY 4.0](LICENSE-SPEC) · Code [Apache 2.0](LICENSE-CODE)
 
