@@ -193,7 +193,10 @@ say "Upload site content"
 # Cache strategy. A released specification version is IMMUTABLE (governance §4),
 # so it may be cached for a year. Everything else is short, because the site is
 # edited and a stale nav is worse than a cache miss.
-run gcloud storage rsync -r -d "$PUBLIC" "gs://$BUCKET" \
+# --delete-unmatched-destination-objects is the mirror flag (gsutil's old `-d`).
+# It is what stops a page deleted from the source living on forever in the bucket.
+run gcloud storage rsync -r --delete-unmatched-destination-objects \
+    "$PUBLIC" "gs://$BUCKET" \
     --cache-control="public, max-age=300"
 
 run gcloud storage objects update "gs://$BUCKET/assets/**" \

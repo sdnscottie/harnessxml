@@ -67,7 +67,8 @@ jobs:
 
       - name: Upload site
         run: |
-          gcloud storage rsync -r -d site/public "gs://${BUCKET}" \
+          gcloud storage rsync -r --delete-unmatched-destination-objects \
+            site/public "gs://${BUCKET}" \
             --cache-control="public, max-age=300"
 
       - name: Cache policy — released schemas are immutable, so cache for a year
