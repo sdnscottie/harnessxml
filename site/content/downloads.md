@@ -93,6 +93,20 @@ they cannot rot without CI noticing.
 | [`invoice-approval.hxml`](/examples-src/enterprise/invoice-approval.hxml) | Business process | approval routing by value, guards vs decisions, security and provenance |
 | [`weight-training.hxml`](/examples-src/training/weight-training.hxml) | Adaptive training | domain customisation with zero new core constructs — a barbell, a sensor and a human instead of a server |
 
+### Authored as visual maps
+
+The same harnesses as **Rumima `.rmmx` documents**, with screenshots of the
+actual application rendering them:
+
+| map | demonstrates |
+|---|---|
+| [`document-triage.rmmx`](/examples-src/rmmx/document-triage.rmmx) | the five typed edge relationships, confidence-gated routing, a non-idempotent human step |
+| [`weighted-model-router.rmmx`](/examples-src/rmmx/weighted-model-router.rmmx) | weighted model selection, LoRA finetuning as a declared resource property, quality-gated escalation from a local qwen3 to a frontier model |
+
+Opening them needs [Rumima](https://rumima.visml.com/); reading them does not —
+every node's description carries its HarnessXML fragment. The `.hxml` these
+export to is vendor-neutral and runs on any conforming runtime.
+
 ## Reference implementation
 
 Apache-2.0. Parser, validator and execution model in Rust, plus the `harnessxml`
