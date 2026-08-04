@@ -21,24 +21,24 @@ along with the fact that the CC BY and Apache grants already made are
 irrevocable — so the specification is forkable regardless of what VisML does
 later.
 
-## VisML sells RuMima and stewards the specification. Isn't that a conflict?
+## VisML sells Rumima and stewards the specification. Isn't that a conflict?
 
 Yes. It is named explicitly in
 [governance §1](/governance/#1-the-bargain) rather than glossed over.
 
-The structural answers: RuMima uses the same public extension mechanism as any
+The structural answers: Rumima uses the same public extension mechanism as any
 third party, with no privileged extension point. The reference runtime is a
-separate Apache-2.0 implementation, not RuMima. And conformance is defined by a
+separate Apache-2.0 implementation, not Rumima. And conformance is defined by a
 published test suite — so "compatible" means "passes the suite", never "agrees
-with RuMima".
+with Rumima".
 
-If the specification and RuMima disagree, the specification is right and RuMima
+If the specification and Rumima disagree, the specification is right and Rumima
 has a bug.
 
-## Do I need RuMima to use HarnessXML?
+## Do I need Rumima to use HarnessXML?
 
 No. A document is a text file conforming to a published schema. Write it by hand,
-generate it, or build your own editor. RuMima is one authoring environment.
+generate it, or build your own editor. Rumima is one authoring environment.
 
 ## Why XML in 2026?
 
@@ -79,7 +79,7 @@ HarnessXML documents use **`.hxml`**, media type `application/harnessxml+xml`.
 Neither affects validity — an implementation must recognise a document from its
 root element and namespace, never from its filename.
 
-`.visml` is VisML's own format, shared across its products including RuMima. It
+`.visml` is VisML's own format, shared across its products including Rumima. It
 carries canvas layout, colours, grouping and editor state that HarnessXML
 deliberately excludes, and it **embeds a complete HarnessXML document** as a
 child element. Export lifts that element out; import wraps it.

@@ -53,7 +53,7 @@ portable across the tools and runtimes that read it.
 <svg viewBox="0 0 940 210" xmlns="http://www.w3.org/2000/svg" role="img"
      aria-labelledby="archtitle archdesc">
   <title id="archtitle">HarnessXML architecture pipeline</title>
-  <desc id="archdesc">A visual graph authored in RuMima becomes an internal object
+  <desc id="archdesc">A visual graph authored in Rumima becomes an internal object
     model, is serialised to a HarnessXML document, checked by a validator, executed
     by a harness runtime, and observed through monitoring. The HarnessXML document
     is the open interchange point that any tool may produce or consume.</desc>
@@ -75,7 +75,7 @@ portable across the tools and runtimes that read it.
     <g>
       <rect x="12" y="34" width="120" height="56" rx="6"
             fill="none" stroke="currentColor" stroke-width="1.5" opacity=".75"/>
-      <text x="72" y="57" fill="currentColor" font-weight="600">RuMima</text>
+      <text x="72" y="57" fill="currentColor" font-weight="600">Rumima</text>
       <text x="72" y="74" fill="currentColor" opacity=".7">Visual Graph</text>
     </g>
     <g>
@@ -123,16 +123,16 @@ portable across the tools and runtimes that read it.
     anyone may build an editor, parser, validator, runtime, compiler or SDK against the specification
   </text>
   <text x="470" y="184" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".55">
-    RuMima Enterprise Studio is VisML's commercial authoring environment — one implementation, not the definition
+    Rumima Enterprise Studio is VisML's commercial authoring environment — one implementation, not the definition
   </text>
 </svg>
 </div>
 
-**RuMima is the flagship commercial visual designer for HarnessXML. HarnessXML is
-not RuMima's file format.** The specification is open and vendor-neutral: build
+**Rumima is the flagship commercial visual designer for HarnessXML. HarnessXML is
+not Rumima's file format.** The specification is open and vendor-neutral: build
 your own editor, parser, validator, runtime, compiler, importer, exporter or SDK
 against it, commercially, without asking permission. If the specification and
-RuMima ever disagree, the specification is right and RuMima has a bug.
+Rumima ever disagree, the specification is right and Rumima has a bug.
 
 ## What a document looks like
 

@@ -176,7 +176,13 @@
     <node id="release_and_rescan" type="task" name="Release and rescan"
           impl="cell.motion.open_gripper" idempotent="true">
       <description>Grip verification failed, so nothing is held — safe to just
-        open and let the next iteration re-detect.</description>
+        open the gripper and let the NEXT LOOP ITERATION re-detect.
+
+        Note what is deliberately absent: an edge back to scan_bin. That would
+        express a loop-back, and HarnessXML has no cycles — repetition is a loop
+        node, which carries a required bound. A dependency edge back to scan_bin
+        looks reasonable and deadlocks, because scan_bin would then wait on a
+        node that only runs after it.</description>
       <resourceRef ref="arm" role="device"/>
     </node>
 
@@ -204,11 +210,6 @@
 
     <edge id="r_grip"   from="grasp_part"    to="verify_grip"        type="data" fromPort="gripWidth" toPort="expectedWidth"/>
     <edge id="r_check"  from="verify_grip"   to="grip_ok"            type="control"/>
-
-    <edge id="r_rescan" from="release_and_rescan" to="scan_bin"      type="dependency">
-      <description>Dependency rather than control: satisfied by ANY terminal
-        state, because a failed release still needs a rescan.</description>
-    </edge>
 
     <edge id="r_done"   from="pick_cycle"    to="report"             type="control"/>
 

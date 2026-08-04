@@ -60,7 +60,7 @@ There are two extensions in this ecosystem, and only one of them is specified he
 | extension | format | open? |
 |---|---|---|
 | **`.hxml`** | **HarnessXML** — executable workflows, specified here | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language — the shared native format of VisML's products, including RuMima | vendor format |
+| `.visml` | VisML Markup Language — the shared native format of VisML's products, including Rumima | vendor format |
 
 A `.visml` document **embeds** a complete HarnessXML document as a child element,
 alongside the canvas layout, colours and editor state that HarnessXML
@@ -86,6 +86,7 @@ they cannot rot without CI noticing.
 | [`pick-and-place.hxml`](/examples-src/robotics/pick-and-place.hxml) | Robotics | bounded loops, non-idempotent physical actions, compensation |
 | [`config-rollout.hxml`](/examples-src/networking/config-rollout.hxml) | Network automation | canary staging, quorum barrier, declared rollback per device |
 | [`invoice-approval.hxml`](/examples-src/enterprise/invoice-approval.hxml) | Business process | approval routing by value, guards vs decisions, security and provenance |
+| [`weight-training.hxml`](/examples-src/training/weight-training.hxml) | Adaptive training | domain customisation with zero new core constructs — a barbell, a sensor and a human instead of a server |
 
 ## Reference implementation
 
@@ -99,10 +100,19 @@ cargo build --release
 ```
 
 ```bash
-harnessxml validate  workflow.hxml     # schema + specification rules
-harnessxml graph     workflow.hxml     # print the resolved execution graph
-harnessxml explain   workflow.hxml     # per-node scheduling analysis
+harnessxml validate workflow.hxml                    # schema + specification rules
+harnessxml graph    workflow.hxml                    # the resolved execution graph
+harnessxml explain  workflow.hxml                    # what each node waits for
+harnessxml run      workflow.hxml                    # EXECUTE it
+harnessxml run      workflow.hxml --scenario s.txt --trace
 ```
+
+The executor implements the full model of chapters 5–8: the lifecycle state
+machine, join policies, guards, decisions in document order, the four loop kinds
+with `maxIterations` enforced, retry policies with backoff, and compensation
+unwinding in reverse completion order. Because `impl` is opaque, node outcomes
+come from a **scenario script**, which is what makes a run — and therefore a
+conformance trace — reproducible.
 
 Its job is to be unambiguous rather than fast — every normative rule has running
 code and a test behind it.
@@ -145,6 +155,6 @@ level. See [conformance](/conformance/).
 |---|---|
 | Specification text, this website | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | Schemas, examples, reference code, conformance suite | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
-| "HarnessXML", "VisML", "RuMima" | trademarks, not licensed by either |
+| "HarnessXML", "VisML", "Rumima" | trademarks, not licensed by either |
 
 See [licensing](/licensing/) for what that means in practice.

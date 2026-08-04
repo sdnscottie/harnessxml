@@ -38,7 +38,7 @@ one attribute.
 
 ```xml
 <provenance>
-  <generator name="RuMima Enterprise Studio" version="1.0" vendor="VisML"/>
+  <generator name="Rumima Enterprise Studio" version="1.0" vendor="VisML"/>
   <source uri="visml://finance/invoice-approval.visml"
           type="visual-graph"
           digest="sha256:1a2b3c…"/>

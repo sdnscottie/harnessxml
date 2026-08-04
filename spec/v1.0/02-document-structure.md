@@ -118,9 +118,17 @@ language, before HarnessXML-aware tooling runs.
 If `@entry` is present, it **MUST** name a node in the harness, and that node is
 the sole entry point.
 
-If `@entry` is absent, the entry set is **every node with no incoming `control`,
-`data` or `dependency` edge**. Incoming `error` and `compensation` edges do not
-count — a node reachable only by an error edge is a handler, not a start.
+If `@entry` is absent, the entry set is **every node with no incoming edge of any
+type**.
+
+The earlier wording of this rule said "no incoming `control`, `data` or
+`dependency` edge", which contradicted its own next sentence: an error handler
+has *only* an incoming `error` edge, so it satisfied the rule and started as if
+it were an entry point. The reference implementation ran a failure handler on a
+workflow where nothing had failed, which is how the contradiction was found.
+
+**A node reachable only by an `error` or `compensation` edge is a handler, not a
+start**, and does not become ready until something has actually failed.
 
 A harness whose entry set is empty is invalid (`HX-3001`). An empty entry set
 means every node waits for another, which is a cycle: nothing can ever begin.
@@ -230,7 +238,7 @@ and the direction matters more than anything else in this section.
 | extension | format | what it is | open? |
 |---|---|---|---|
 | **`.hxml`** | **HarnessXML** | the specification defined by this document — executable workflows | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language | the shared native format of VisML's products, including RuMima | vendor format |
+| `.visml` | VisML Markup Language | the shared native format of VisML's products, including Rumima | vendor format |
 
 **Only `.hxml` is specified here, and only `.hxml` is an interchange format.**
 

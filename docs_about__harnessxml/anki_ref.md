@@ -23,7 +23,7 @@ Source of truth for the compact reference block in the upper-right of every
 HarnessXML is its portable machine-readable form → the runtime executes that
 specification consistently across platforms.
 
-**Pipeline:** RuMima Visual Graph → Object Model → **HarnessXML** → Validator →
+**Pipeline:** Rumima Visual Graph → Object Model → **HarnessXML** → Validator →
 Harness Runtime → Execution → Monitoring
 
 ## Extensions
@@ -31,7 +31,7 @@ Harness Runtime → Execution → Monitoring
 | ext | format | open? |
 |---|---|---|
 | **`.hxml`** | HarnessXML — this spec | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language (RuMima + all VisML products) | vendor format |
+| `.visml` | VisML Markup Language (Rumima + all VisML products) | vendor format |
 
 `.visml` **embeds** a complete `<harness>`; export lifts it out. Dependency runs
 **one way only** — HarnessXML never depends on `.visml`. Not a subset/profile.

@@ -1,0 +1,4 @@
+# classify fails twice with a retryable class, then succeeds on the third attempt
+classify@1  fail rate_limit throttled
+classify@2  fail transient  upstream blip
+classify@3  ok   confidence=0.95 category=invoice rationale=clear

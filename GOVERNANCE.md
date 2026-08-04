@@ -27,23 +27,23 @@ VisML accepts binding constraints on how it may change the specification.
 | A competing implementation can prove conformance | conformance suite, §7 |
 
 **What VisML retains:** final editorial decision on the specification, and the
-`HarnessXML`, `VisML` and `RuMima` trademarks. Trademarks are the one thing not
+`HarnessXML`, `VisML` and `Rumima` trademarks. Trademarks are the one thing not
 open-licensed — they are what prevents a fork from calling itself official
 while diverging. Anyone may *implement* HarnessXML; nobody may claim to *be* it.
 
-**The conflict of interest, stated plainly.** VisML also sells RuMima
+**The conflict of interest, stated plainly.** VisML also sells Rumima
 Enterprise Studio, the flagship commercial authoring environment for
 HarnessXML. That is a real conflict and pretending otherwise would be worse
 than naming it. The structural answer:
 
-- **No privileged extension point.** RuMima uses the same public extension
-  mechanism (§6) as any third party. If RuMima needs a capability, it is
+- **No privileged extension point.** Rumima uses the same public extension
+  mechanism (§6) as any third party. If Rumima needs a capability, it is
   proposed as an HXEP in public, or it lives in a vendor namespace where
   everyone can see it is not part of the core specification.
-- **The reference runtime is not RuMima.** `reference-runtime/` is an
-  independent Apache-2.0 implementation. If the specification and RuMima
-  disagree, the specification is right and RuMima has a bug.
-- **Conformance is defined by the test suite, not by matching RuMima.**
+- **The reference runtime is not Rumima.** `reference-runtime/` is an
+  independent Apache-2.0 implementation. If the specification and Rumima
+  disagree, the specification is right and Rumima has a bug.
+- **Conformance is defined by the test suite, not by matching Rumima.**
 
 ---
 

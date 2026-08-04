@@ -10,7 +10,7 @@ intelligent system workflows, and **harnessxml.com**, its official public home.
 
 - **Domain:** `harnessxml.com` — owned, GCP-hosted alongside visml.com
 - **Repo:** `gitlab.com/visml/harnessxml` (public)
-- **Steward:** VisML · **Flagship designer:** RuMima Enterprise Studio
+- **Steward:** VisML · **Flagship designer:** Rumima Enterprise Studio
 - **Status:** v1.0 **draft** — see §Status
 
 ## What it is
@@ -27,7 +27,7 @@ The three-line philosophy the homepage leads with:
 3. The runtime executes that specification consistently across platforms.
 
 ```
-RuMima Visual Graph → Internal Object Model → HarnessXML
+Rumima Visual Graph → Internal Object Model → HarnessXML
                     → Validator → Harness Runtime → Execution → Monitoring
 ```
 
@@ -35,8 +35,8 @@ RuMima Visual Graph → Internal Object Model → HarnessXML
 
 VisML is both steward and vendor, which is a real conflict of interest.
 `GOVERNANCE.md §1` names it rather than glossing it, and the structural answers
-are: no privileged extension point (RuMima uses the same public mechanism as any
-third party), a reference runtime that is **not** RuMima, and conformance defined
+are: no privileged extension point (Rumima uses the same public mechanism as any
+third party), a reference runtime that is **not** Rumima, and conformance defined
 by a published test suite rather than by agreement with any product.
 
 **File extensions, and the rule that keeps the whole positioning honest:**
@@ -44,7 +44,7 @@ by a published test suite rather than by agreement with any product.
 | ext | format | open? |
 |---|---|---|
 | **`.hxml`** | **HarnessXML** — this specification | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language — shared native format of VisML's products, incl. RuMima | vendor format |
+| `.visml` | VisML Markup Language — shared native format of VisML's products, incl. Rumima | vendor format |
 
 A `.visml` document **embeds** a complete `<harness>` as a child element; export
 lifts it out. **The dependency runs one way only** — HarnessXML must be fully
@@ -158,10 +158,12 @@ and leaks `server: UploadServer`; harnessxml.com sets HSTS/CSP/etc. via
 | piece | state |
 |---|---|
 | Object model, XSD, 16 spec chapters | drafted; schema compiles, enforces referential integrity via `xs:key`/`xs:keyref` |
-| 4 reference examples | complete, schema-valid, double as conformance fixtures |
-| Reference **validator** (Rust) | working — all layer-1/2 rules, 14 tests, clippy/fmt clean |
-| Reference **executor** | **not started** |
-| Conformance corpus | runner works; 11 fixtures; corpus incomplete |
+| 5 reference examples | AI, robotics, networking, enterprise, training — schema-valid, double as fixtures |
+| Reference **validator** (Rust) | working — all layer-1/2 rules, clippy/fmt clean |
+| Reference **executor** (Rust) | **working** — lifecycle, joins, decisions, loops, retries, compensation, JSON traces |
+| Expression language | working — full evaluator (ch.10) |
+| Tests | **43** passing |
+| Conformance corpus | runner works; 12 fixtures + 3 frozen execution traces; corpus incomplete |
 | SDKs beyond Rust | **not started** |
 | Site | 31 pages, builds clean, link-checked |
 | GCP deploy | scripted, **not yet run** |

@@ -15,14 +15,14 @@ adoption made it awkward not to.
 |---|---|---|
 | Specification text, this website | Creative Commons Attribution 4.0 | `CC-BY-4.0` |
 | Schemas, examples, reference implementation, conformance suite, SDKs | Apache License 2.0 | `Apache-2.0` |
-| "HarnessXML", "VisML", "RuMima" | **not licensed** — trademarks | — |
+| "HarnessXML", "VisML", "Rumima" | **not licensed** — trademarks | — |
 
 ## What you may do
 
 Without asking, without paying, without telling anyone:
 
 - **Implement HarnessXML.** Build an editor, parser, validator, runtime,
-  compiler, importer, exporter or SDK. Sell it. Compete with RuMima.
+  compiler, importer, exporter or SDK. Sell it. Compete with Rumima.
 - **Copy and redistribute the specification**, in whole or in part, in any medium.
 - **Translate it.** Translations are explicitly welcome, and a good translation is
   a contribution to the specification's reach, not a derivative to be tolerated.

@@ -14,7 +14,7 @@ status: stable
 <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" role="img"
      aria-labelledby="pipetitle pipedesc">
   <title id="pipetitle">HarnessXML end-to-end architecture</title>
-  <desc id="pipedesc">A visual graph is authored in a designer such as RuMima and
+  <desc id="pipedesc">A visual graph is authored in a designer such as Rumima and
     held as an internal object model. It is serialised to a HarnessXML document,
     which is the open interchange point. A validator checks the document against
     the schema and the specification rules. A conforming runtime loads the
@@ -33,7 +33,7 @@ status: stable
     <text x="140" y="22" font-size="11" opacity=".6" font-weight="700" letter-spacing="1">AUTHORING</text>
     <rect x="40" y="34" width="200" height="94" rx="7" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".7"/>
     <text x="140" y="60" font-weight="600">Visual Graph</text>
-    <text x="140" y="79" font-size="11.5" opacity=".72">RuMima Enterprise Studio</text>
+    <text x="140" y="79" font-size="11.5" opacity=".72">Rumima Enterprise Studio</text>
     <text x="140" y="96" font-size="11.5" opacity=".72">or any other editor</text>
     <text x="140" y="116" font-size="11" opacity=".55">the authoritative design</text>
 
@@ -86,7 +86,7 @@ status: stable
 
 ### 1. Authoring — the visual graph
 
-Where the design lives. RuMima Enterprise Studio is VisML's commercial designer
+Where the design lives. Rumima Enterprise Studio is VisML's commercial designer
 and the flagship authoring environment, but nothing about the architecture
 depends on it: the graph could come from another editor, from a generator, or
 from a program emitting documents directly.
@@ -95,6 +95,10 @@ The requirement that matters is the **round trip**. A document generated from a
 graph must reopen as that graph, without loss. If the round trip is lossy, teams
 start editing the generated file by hand, and the graph stops being authoritative
 — which collapses the whole model.
+
+See [Visual Authoring](/visual-authoring/) for what an editor must preserve, why
+layout is deliberately absent from the document, and how a host format embeds a
+harness.
 
 ### 2. The internal object model
 
@@ -180,5 +184,5 @@ exists so that every normative rule has running code and a test behind it, and s
 that a disagreement about what the specification means can be settled by reading
 an implementation instead of by arguing about prose.
 
-It is explicitly **not** RuMima. If the reference runtime and RuMima disagree,
+It is explicitly **not** Rumima. If the reference runtime and Rumima disagree,
 the specification decides, and at most one of them is right.

@@ -21,9 +21,9 @@ that agreement is what makes execution traces comparable across implementations.
   <desc id="lcdesc">A node starts PENDING. When its join condition is satisfied it
     becomes READY, then RUNNING. From RUNNING it reaches SUCCEEDED, or FAILED. A
     failure with retries remaining goes to RETRYING and back to READY. A node whose
-    guard evaluates false goes from READY to SKIPPED. A node that can no longer be
-    reached, or is cancelled, goes to CANCELLED. SUCCEEDED, SKIPPED, FAILED,
-    CANCELLED and COMPENSATED are terminal.</desc>
+    guard evaluates false goes from READY to SKIPPED. A node cancelled before it
+    finished goes to CANCELLED; a node no path ever reached simply stays PENDING.
+    SUCCEEDED, SKIPPED, FAILED, CANCELLED and COMPENSATED are terminal.</desc>
   <defs>
     <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5"
             markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -84,7 +84,7 @@ that agreement is what makes execution traces comparable across implementations.
 | `RUNNING` | executing | no |
 | `RETRYING` | an attempt failed; retries remain; waiting out the backoff | no |
 | `SUCCEEDED` | completed successfully | **yes** |
-| `SKIPPED` | guard evaluated false, or unreachable — **a successful outcome** | **yes** |
+| `SKIPPED` | **reached**, and its guard evaluated false — a successful outcome | **yes** |
 | `FAILED` | failed with retries exhausted | **yes** |
 | `CANCELLED` | terminated before completion | **yes** |
 | `COMPENSATED` | had succeeded, then was rolled back | **yes** |
@@ -96,8 +96,7 @@ A conforming runtime **MUST NOT** perform any transition not listed here.
 | from | to | when |
 |---|---|---|
 | `PENDING` | `READY` | join condition satisfied |
-| `PENDING` | `SKIPPED` | every incoming edge resolved negative |
-| `PENDING` | `CANCELLED` | instance cancelled, or node became unreachable |
+| `PENDING` | `CANCELLED` | instance cancelled while the node was still waiting |
 | `READY` | `RUNNING` | scheduled, guard true |
 | `READY` | `SKIPPED` | guard evaluated false |
 | `READY` | `CANCELLED` | instance cancelled, or a sibling satisfied an `any` join |
@@ -144,8 +143,17 @@ This is the expected outcome for the branch a decision did not take. It is not a
 error, and a runtime **MUST NOT** report the instance as failed because nodes
 remain `PENDING`.
 
-Distinguish it from `CANCELLED`: `PENDING` means *never reached*; `CANCELLED`
-means *reached, then stopped*. Two different things in an incident review.
+Distinguish it from the two states it is most often confused with. All three
+are ordinary outcomes, and an incident review needs to tell them apart:
+
+| state | means | successors |
+|---|---|---|
+| `PENDING` at completion | **never reached** — no path arrived | also not reached |
+| `SKIPPED` | **reached**, and its guard was false | control successors still run |
+| `CANCELLED` | **reached and started**, then stopped | not reached |
+
+Conflating `PENDING` with `SKIPPED` makes the untaken branch of every decision
+report as a success that ran.
 
 ## 6.5 Loop iterations
 

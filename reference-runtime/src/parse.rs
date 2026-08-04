@@ -61,6 +61,22 @@ fn attr(e: &BytesStart, key: &str) -> Option<String> {
     None
 }
 
+/// Every attribute on an element, for declarations the expression language can
+/// read back through `artifact('id')` / `resource('id')`.
+fn all_attrs(e: &BytesStart) -> Vec<(String, String)> {
+    e.attributes()
+        .flatten()
+        .filter_map(|a| {
+            let k = String::from_utf8_lossy(a.key.local_name().into_inner()).into_owned();
+            let v = a
+                .normalized_value(XmlVersion::Explicit1_0)
+                .ok()?
+                .into_owned();
+            Some((k, v))
+        })
+        .collect()
+}
+
 fn bool_attr(e: &BytesStart, key: &str, default: bool) -> bool {
     match attr(e, key).as_deref() {
         Some("true") => true,
@@ -214,12 +230,14 @@ fn handle_start(
         ("resources", "resource") => h.resources.push(Resource {
             id: attr(e, "id").unwrap_or_default(),
             kind: attr(e, "type").unwrap_or_default(),
+            attrs: all_attrs(e),
             line,
         }),
 
         ("artifacts", "artifact") => h.artifacts.push(Artifact {
             id: attr(e, "id").unwrap_or_default(),
             kind: attr(e, "type").unwrap_or_default(),
+            attrs: all_attrs(e),
             line,
         }),
 
@@ -244,6 +262,7 @@ fn handle_start(
                     ty,
                     from_port: attr(e, "fromPort"),
                     to_port: attr(e, "toPort"),
+                    condition: attr(e, "condition"),
                     line,
                 }),
                 None => diags.push(Diagnostic::error(
@@ -259,8 +278,8 @@ fn handle_start(
                 name: attr(e, "name").unwrap_or_default(),
                 ty: attr(e, "type"),
                 required: bool_attr(e, "required", true),
-                has_default: attr(e, "default").is_some(),
-                has_value: attr(e, "value").is_some(),
+                default: attr(e, "default"),
+                value: attr(e, "value"),
                 line,
             };
             if let Some(v) = attr(e, "value") {
@@ -282,10 +301,16 @@ fn handle_start(
 
         ("config", "property") | ("resource", "property") | ("artifact", "property") => {
             let pname = attr(e, "name").unwrap_or_default();
+            let pvalue = attr(e, "value").unwrap_or_default();
+            if parent == "config"
+                && let Some(n) = h.nodes.last_mut()
+            {
+                n.config.push((pname.clone(), pvalue.clone()));
+            }
             h.scalar_values.push(Scalar {
                 context: format!("property '{pname}'"),
                 name: pname,
-                value: attr(e, "value").unwrap_or_default(),
+                value: pvalue,
                 line,
             });
         }
@@ -310,21 +335,39 @@ fn handle_start(
 
         ("node", "guard") => {
             if let Some(n) = h.nodes.last_mut() {
-                n.has_guard = true;
+                n.guard = Some(attr(e, "when").unwrap_or_default());
             }
         }
 
         ("node", "retry") => {
             if let Some(n) = h.nodes.last_mut() {
-                n.has_retry = true;
+                n.retry = Some(Retry {
+                    max_attempts: attr(e, "maxAttempts")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(1),
+                    backoff: attr(e, "backoff").unwrap_or_else(|| "exponential".into()),
+                    initial_delay: attr(e, "initialDelay").unwrap_or_else(|| "PT1S".into()),
+                    max_delay: attr(e, "maxDelay"),
+                    multiplier: attr(e, "multiplier")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(2.0),
+                    jitter: bool_attr(e, "jitter", true),
+                    retry_on: attr(e, "retryOn")
+                        .map(|v| v.split_whitespace().map(String::from).collect())
+                        .unwrap_or_default(),
+                });
             }
         }
 
         ("node", "timeout") => {
-            if let Some(d) = attr(e, "duration")
-                && let Some(n) = h.nodes.last_mut()
+            if let Some(n) = h.nodes.last_mut()
+                && let Some(d) = attr(e, "duration")
             {
-                n.durations.push(("timeout".into(), d));
+                n.durations.push(("timeout".into(), d.clone()));
+                n.timeout = Some(Timeout {
+                    duration: d,
+                    on_timeout: attr(e, "onTimeout").unwrap_or_else(|| "fail".into()),
+                });
             }
         }
 
@@ -361,6 +404,12 @@ fn handle_start(
                     count: attr(e, "count").and_then(|c| c.parse().ok()),
                     max_iterations: attr(e, "maxIterations").and_then(|m| m.parse().ok()),
                     body: None,
+                    var: attr(e, "var").unwrap_or_else(|| "item".into()),
+                    index_var: attr(e, "indexVar").unwrap_or_else(|| "index".into()),
+                    max_concurrency: attr(e, "maxConcurrency")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(1),
+                    on_item_failure: attr(e, "onItemFailure").unwrap_or_else(|| "fail".into()),
                     line,
                 });
             }

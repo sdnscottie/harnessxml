@@ -445,8 +445,17 @@ h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor,
   letter-spacing: .03em; color: var(--muted);
 }
 .page-footer p { margin: 0 0 .6rem; }
-.page-footer a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line); }
-.page-footer a:hover { color: var(--signal); border-color: var(--signal); }
+/* Footer links were --muted, identical to the surrounding text, so they did not
+   read as links at all — the VisML attribution in particular looked like plain
+   prose. --structure separates them from body text while staying quieter than
+   --signal, which is reserved for the active/hover state. */
+.page-footer a {
+  color: var(--structure);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  transition: color .2s;
+}
+.page-footer a:hover, .page-footer a:focus-visible { color: var(--signal); }
 
 /* ---------- responsive ---------- */
 

@@ -59,8 +59,9 @@ a name. What makes a run reproducible and an audit trail verifiable.
 scheduler does.
 
 **Entry set** — The nodes where execution begins: the single node named by
-`@entry`, or every node with no incoming `control`, `data` or `dependency` edge.
-Must not be empty (`HX-3001`).
+`@entry`, or every node with **no incoming edge of any type**. A node reachable
+only by an `error` or `compensation` edge is a handler, not a start. Must not be
+empty (`HX-3001`).
 
 **Erratum** — A dated correction to a released specification version, **appended**
 to it. Released text is never edited in place.
@@ -137,13 +138,13 @@ referenced by nodes, so that changing environment is a change to one block.
 **Retry policy** — `<retry>`: how many attempts, with what backoff, on which error
 classes. Absent means one attempt. Invalid on a non-idempotent node (`HX-3301`).
 
-**RuMima** — VisML's commercial visual designer for HarnessXML. One
+**Rumima** — VisML's commercial visual designer for HarnessXML. One
 implementation, not the definition. If it and the specification disagree, the
 specification is right.
 
-**Skipped** — A **terminal successful** state, reached when a guard evaluates
-false or every incoming edge resolved negative. Control successors still run;
-data outputs are unavailable.
+**Skipped** — A **terminal successful** state, reached when a node IS reached and
+its guard evaluates false. Control successors still run; data outputs are
+unavailable. Distinct from a node no path reached, which stays **Pending**.
 
 **Specification version** — `specVersion`, the version of HarnessXML a document is
 written against. Distinct from `documentVersion`, the author's own revision.
@@ -157,6 +158,10 @@ validatable; recursion is invalid (`HX-3002`).
 
 **Transform** — A node type declared to be a **pure** function of its inputs.
 Always freely retryable, and its output may be cached.
+
+**Unreachable** — A node no path will ever reach. Its outgoing edges become
+resolved-negative, recursively, so a downstream join can resolve instead of
+waiting forever. An unreachable node stays **Pending**.
 
 **Unwinding** — What a runtime does when a failure propagates: cancel in-flight
 work, then compensate succeeded nodes in reverse completion order.

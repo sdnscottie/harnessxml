@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HarnessXML 1.0 reference example — adaptive strength training.
+
+  A domain deliberately unlike the others. There is no server, no model endpoint
+  and no robot: the "resources" are a barbell, a rep-counting sensor and a human
+  being. It is here to demonstrate that the specification describes the SHAPE of
+  a workflow and stops at the boundary of the work, so a personal training
+  programme and an invoice-approval process are the same kind of object.
+
+  It also shows DOMAIN CUSTOMISATION. Everything sport-specific — the 1RM
+  percentages, the RPE thresholds, the deload rule — lives in <config> and in a
+  vendor <extension>, never in new HarnessXML constructs. That is the test of
+  whether a format generalises: a new domain should need zero new core elements.
+
+  Copyright 2026 VisML. SPDX-License-Identifier: Apache-2.0
+-->
+<harness xmlns="https://harnessxml.com/spec/1.0"
+         id="strength_session"
+         specVersion="1.0"
+         name="Adaptive strength session with autoregulated progression"
+         entry="load_programme">
+
+  <metadata>
+    <title>Adaptive strength session with autoregulated progression</title>
+    <description>Runs one training session: warm-up, then each prescribed lift
+      for its working sets, autoregulating load from reps-in-reserve, and
+      deciding progression, hold or deload at the end.</description>
+    <author>VisML</author>
+    <created>2026-08-04T09:00:00Z</created>
+    <license>Apache-2.0</license>
+    <tags>
+      <tag>training</tag>
+      <tag>autoregulation</tag>
+      <tag>human-in-the-loop</tag>
+    </tags>
+    <provenance>
+      <generator name="Rumima Enterprise Studio" version="1.0" vendor="VisML"/>
+    </provenance>
+  </metadata>
+
+  <security classification="confidential"/>
+
+  <resources>
+    <resource id="athlete_log" type="datastore" name="Training log" provider="sqlite">
+      <description>Session history: loads, reps, RPE, bodyweight.</description>
+      <property name="path" value="file:///var/lib/training/athlete.db"/>
+    </resource>
+
+    <resource id="bar_tracker" type="device" name="Barbell velocity tracker" provider="ble">
+      <description>Measures mean concentric velocity, which is what makes
+        autoregulation objective rather than a guess.</description>
+      <property name="endpoint" value="ble://tracker-0x41"/>
+      <property name="sampleHz" value="200"/>
+    </resource>
+
+    <resource id="coach_app" type="service" name="Athlete prompt surface" provider="push">
+      <property name="channel" value="mobile"/>
+    </resource>
+  </resources>
+
+  <artifacts>
+    <artifact id="programme" type="config" name="Mesocycle programme"
+              uri="file:///var/lib/training/mesocycle-w7.json"
+              mediaType="application/json"
+              digest="sha256:7c3e9a1b5d2f804a6e8c0b2d4f6a8c0e1b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a"/>
+  </artifacts>
+
+  <nodes>
+
+    <node id="load_programme" type="source" name="Load today's prescription"
+          impl="training.programme.today">
+      <description>Reads the mesocycle and returns the lifts prescribed for this
+        session, each with target sets, reps and percentage of training max.</description>
+      <outputs>
+        <output name="lifts" type="array&lt;lift&gt;"/>
+        <output name="sessionId" type="string"/>
+      </outputs>
+      <resourceRef ref="athlete_log" role="datastore"/>
+      <artifactRef ref="programme" direction="in"/>
+      <retry maxAttempts="3" backoff="fixed" initialDelay="PT1S"/>
+    </node>
+
+    <node id="readiness_check" type="human" name="Readiness check"
+          impl="training.prompt.readiness" idempotent="false">
+      <description>Sleep, soreness and stress, self-reported. Cheap to collect
+        and the strongest predictor of whether today's prescription is
+        appropriate.</description>
+      <outputs>
+        <output name="score" type="number"/>
+        <output name="bodyweightKg" type="number"/>
+      </outputs>
+      <resourceRef ref="coach_app" role="service"/>
+      <timeout duration="PT10M" onTimeout="fail"/>
+    </node>
+
+    <node id="autoregulate" type="transform" name="Autoregulate today's load"
+          impl="training.load.autoregulate">
+      <description>Pure function of prescription and readiness. Being a transform
+        means it is freely retryable and its result is cacheable — the same
+        inputs always give the same loads.</description>
+      <inputs>
+        <input name="lifts" type="array&lt;lift&gt;"/>
+        <input name="readiness" type="number"/>
+      </inputs>
+      <outputs>
+        <output name="adjusted" type="array&lt;lift&gt;"/>
+        <output name="adjustmentPct" type="number"/>
+      </outputs>
+      <config>
+        <property name="readinessFloor" value="4"/>
+        <property name="maxDownshiftPct" value="15"/>
+        <property name="maxUpshiftPct" value="5"/>
+      </config>
+    </node>
+
+    <node id="warmup" type="task" name="Warm-up" impl="training.session.warmup">
+      <inputs>
+        <input name="firstLift" type="lift" value="${autoregulate.adjusted}"/>
+      </inputs>
+      <resourceRef ref="coach_app" role="service"/>
+    </node>
+
+    <node id="lift_cycle" type="loop" name="Work through each prescribed lift">
+      <description>Sequential by design: there is one barbell and one athlete, so
+        maxConcurrency stays 1 for the same reason the robotics example does.</description>
+      <loop kind="forEach"
+            over="${autoregulate.adjusted}"
+            var="lift"
+            indexVar="liftIndex"
+            maxIterations="8"
+            maxConcurrency="1"
+            onItemFailure="continue">
+        <body ref="perform_lift"/>
+      </loop>
+    </node>
+
+    <node id="perform_lift" type="task" name="Perform one lift's working sets"
+          impl="training.session.lift" idempotent="false">
+      <description>Not idempotent — the athlete cannot un-perform a set. A
+        runtime must never silently retry this, which is exactly the same rule
+        that stops the robotics example re-grasping a held part.</description>
+      <inputs>
+        <input name="lift" type="lift" value="${lift}"/>
+        <input name="targetVelocity" type="number" value="${config.minMeanVelocity}"/>
+      </inputs>
+      <outputs>
+        <output name="completedReps" type="integer"/>
+        <output name="meanVelocity" type="number"/>
+        <output name="repsInReserve" type="number"/>
+      </outputs>
+      <config>
+        <property name="minMeanVelocity" value="0.28"/>
+        <property name="restSeconds" value="180"/>
+      </config>
+      <resourceRef ref="bar_tracker" role="device"/>
+      <resourceRef ref="coach_app" role="service"/>
+      <timeout duration="PT30M" onTimeout="fail"/>
+      <extension namespace="https://visml.com/harness/training/1" required="false">
+        <tr:prescription xmlns:tr="https://visml.com/harness/training/1"
+                         scheme="rpe" targetRpe="8" cluster="false"/>
+      </extension>
+    </node>
+
+    <node id="log_sets" type="sink" name="Record the session"
+          impl="training.log.append" idempotent="true">
+      <inputs>
+        <input name="sessionId" type="string"/>
+      </inputs>
+      <resourceRef ref="athlete_log" role="datastore"/>
+      <retry maxAttempts="5" backoff="exponential" initialDelay="PT1S" maxDelay="PT30S"/>
+    </node>
+
+    <node id="progression" type="decision" name="Progress, hold or deload?">
+      <description>Cases in document order, first true wins — so the policy reads
+        top-down exactly as a coach would state it.</description>
+      <cases>
+        <case when="${perform_lift.repsInReserve >= 2 and perform_lift.meanVelocity >= 0.30}" to="increase_load"/>
+        <case when="${perform_lift.repsInReserve &lt;= 0 or perform_lift.meanVelocity &lt; 0.22}" to="deload"/>
+        <otherwise to="hold_load"/>
+      </cases>
+    </node>
+
+    <node id="increase_load" type="task" name="Increase training max"
+          impl="training.programme.progress" idempotent="true">
+      <config>
+        <property name="upperBodyIncrementKg" value="2.5"/>
+        <property name="lowerBodyIncrementKg" value="5"/>
+      </config>
+      <resourceRef ref="athlete_log" role="datastore"/>
+    </node>
+
+    <node id="hold_load" type="task" name="Hold training max"
+          impl="training.programme.hold" idempotent="true">
+      <resourceRef ref="athlete_log" role="datastore"/>
+    </node>
+
+    <node id="deload" type="task" name="Deload"
+          impl="training.programme.deload" idempotent="true">
+      <description>Reached when reps-in-reserve hit zero or bar speed collapsed —
+        the objective signals that the prescription outran recovery.</description>
+      <config>
+        <property name="deloadPct" value="10"/>
+      </config>
+      <resourceRef ref="athlete_log" role="datastore"/>
+    </node>
+
+    <node id="notify_athlete" type="sink" name="Send the session summary"
+          impl="training.prompt.summary">
+      <resourceRef ref="coach_app" role="service"/>
+    </node>
+
+    <node id="abort_session" type="sink" name="Abort the session"
+          impl="training.session.abort">
+      <description>Error target. A session that cannot be run safely ends
+        deliberately rather than continuing on stale prescriptions.</description>
+      <inputs>
+        <input name="reason" type="string" value="readiness or equipment failure"/>
+      </inputs>
+      <resourceRef ref="coach_app" role="service"/>
+    </node>
+
+  </nodes>
+
+  <edges>
+    <edge id="t_ready"  from="load_programme"  to="readiness_check" type="control"/>
+    <edge id="t_lifts"  from="load_programme"  to="autoregulate"    type="data" fromPort="lifts" toPort="lifts"/>
+    <edge id="t_score"  from="readiness_check" to="autoregulate"    type="data" fromPort="score" toPort="readiness"/>
+
+    <edge id="t_warm"   from="autoregulate"    to="warmup"          type="control"/>
+    <edge id="t_cycle"  from="warmup"          to="lift_cycle"      type="control"/>
+
+    <edge id="t_log"    from="lift_cycle"      to="log_sets"        type="control"/>
+    <edge id="t_sid"    from="load_programme"  to="log_sets"        type="data" fromPort="sessionId" toPort="sessionId"/>
+
+    <edge id="t_prog"   from="log_sets"        to="progression"     type="control"/>
+    <edge id="t_done1"  from="increase_load"   to="notify_athlete"  type="control"/>
+    <edge id="t_done2"  from="hold_load"       to="notify_athlete"  type="control"/>
+    <edge id="t_done3"  from="deload"          to="notify_athlete"  type="control"/>
+
+    <edge id="t_err1"   from="readiness_check" to="abort_session"   type="error"/>
+    <edge id="t_err2"   from="load_programme"  to="abort_session"   type="error"/>
+  </edges>
+
+</harness>

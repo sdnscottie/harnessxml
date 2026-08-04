@@ -1,0 +1,24 @@
+[
+  {"node":"receive","from":"PENDING","to":"READY","attempt":0},
+  {"node":"receive","from":"READY","to":"RUNNING","attempt":1},
+  {"node":"receive","from":"RUNNING","to":"SUCCEEDED","attempt":1},
+  {"node":"extract_text","from":"PENDING","to":"READY","attempt":0},
+  {"node":"extract_text","from":"READY","to":"RUNNING","attempt":1},
+  {"node":"extract_text","from":"RUNNING","to":"SUCCEEDED","attempt":1},
+  {"node":"classify","from":"PENDING","to":"READY","attempt":0},
+  {"node":"classify","from":"READY","to":"RUNNING","attempt":1},
+  {"node":"classify","from":"RUNNING","to":"RETRYING","attempt":1,"errorClass":"rate_limit","detail":"backoff 1000ms before attempt 2"},
+  {"node":"classify","from":"RETRYING","to":"READY","attempt":2},
+  {"node":"classify","from":"READY","to":"RUNNING","attempt":2},
+  {"node":"classify","from":"RUNNING","to":"RETRYING","attempt":2,"errorClass":"transient","detail":"backoff 2000ms before attempt 3"},
+  {"node":"classify","from":"RETRYING","to":"READY","attempt":3},
+  {"node":"classify","from":"READY","to":"RUNNING","attempt":3},
+  {"node":"classify","from":"RUNNING","to":"SUCCEEDED","attempt":3},
+  {"node":"route","from":"PENDING","to":"READY","attempt":0},
+  {"node":"route","from":"READY","to":"RUNNING","attempt":1},
+  {"node":"route","from":"RUNNING","to":"SUCCEEDED","attempt":1,"detail":"routed to 'auto_file'"},
+  {"node":"auto_file","from":"PENDING","to":"READY","attempt":0},
+  {"node":"auto_file","from":"READY","to":"RUNNING","attempt":1},
+  {"node":"auto_file","from":"RUNNING","to":"SUCCEEDED","attempt":1}
+]
+examples/ai/document-triage.hxml: succeeded

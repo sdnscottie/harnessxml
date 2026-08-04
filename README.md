@@ -55,9 +55,10 @@ so the labels are deliberately unflattering.
 |---|---|
 | Language design, object model, XSD | drafted; schema compiles and enforces referential integrity |
 | Specification chapters 1–16 | written, marked draft |
-| Reference examples (AI, robotics, networking, enterprise) | complete, schema-valid, used as fixtures |
+| Reference examples (AI, robotics, networking, enterprise, training) | complete, schema-valid, used as fixtures |
 | Reference validator (Rust) | working — parser + all layer-1/2 validation rules |
-| Reference **executor** | not started |
+| Reference **executor** (Rust) | **working** — lifecycle, joins, decisions, loops, retries, compensation, traces |
+| Expression language | working — full evaluator, 11 tests |
 | Conformance corpus | working runner, incomplete corpus |
 | SDKs beyond Rust | not started |
 
@@ -84,6 +85,13 @@ cd reference-runtime && cargo build --release
 # see what each node waits for
 ./target/release/harnessxml explain ../examples/robotics/pick-and-place.hxml
 
+# EXECUTE it, and print the resulting node states
+./target/release/harnessxml run ../examples/ai/document-triage.hxml
+
+# execute a scripted scenario and emit the trace as JSON
+./target/release/harnessxml run ../examples/enterprise/invoice-approval.hxml \
+  --scenario ../conformance/scenarios/payment-fails.txt --trace
+
 # run the conformance suite
 python3 conformance/validate.py --cmd "reference-runtime/target/release/harnessxml validate"
 
@@ -96,7 +104,7 @@ python3 site/build.py --check --serve
 | | | |
 |---|---|---|
 | **`.hxml`** | **HarnessXML** — executable workflows, specified here | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language — the shared native format of VisML's products, including RuMima | vendor format |
+| `.visml` | VisML Markup Language — the shared native format of VisML's products, including Rumima | vendor format |
 
 A `.visml` document **embeds** a complete HarnessXML document as a child element,
 alongside the canvas layout and editor state that HarnessXML excludes. Export
@@ -119,11 +127,11 @@ merely because an HTML page can contain one.
 | Conformance | a published test suite, not agreement with any implementation |
 | Trademarks | reserved — the one lever that makes a conformance claim mean something |
 
-VisML created and stewards HarnessXML **and** sells RuMima Enterprise Studio, the
+VisML created and stewards HarnessXML **and** sells Rumima Enterprise Studio, the
 flagship commercial authoring environment. That is a real conflict of interest,
 and [GOVERNANCE.md §1](GOVERNANCE.md) names it explicitly along with the
 structural limits placed on it — no privileged extension point, a reference
-runtime that is not RuMima, and conformance defined by tests rather than by
+runtime that is not Rumima, and conformance defined by tests rather than by
 agreement with any product.
 
 ## Contributing

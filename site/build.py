@@ -618,7 +618,7 @@ def page_html(page: Page, pages: list[Page], prev: Page | None, nxt: Page | None
       <a href="/spec/{CURRENT_SPEC}/">Specification</a>
       <a href="/downloads/">Downloads</a>
       <a href="/governance/">Governance</a>
-      <a href="{REPO_URL}" rel="noopener" target="_blank">GitHub</a>
+      <a href="{REPO_URL}" rel="noopener" target="_blank">GitLab</a>
     </nav>
     <button class="theme-toggle" id="theme-toggle" aria-label="Switch colour theme" title="Switch colour theme">
       <span aria-hidden="true">◐</span>

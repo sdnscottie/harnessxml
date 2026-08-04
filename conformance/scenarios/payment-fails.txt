@@ -1,0 +1,3 @@
+# The ledger entry posts, then the payment fails. post_ledger has no error edge,
+# so the failure propagates and its compensation (reverse_entry) must run.
+pay fail unavailable payment rail down

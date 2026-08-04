@@ -34,7 +34,7 @@
       <tag>approval</tag>
     </tags>
     <provenance>
-      <generator name="RuMima Enterprise Studio" version="1.0" vendor="VisML"/>
+      <generator name="Rumima Enterprise Studio" version="1.0" vendor="VisML"/>
       <source uri="rmmx://finance/invoice-approval.rmmx"
               type="visual-graph"
               digest="sha256:1a2b3c4d5e6f708192a3b4c5d6e7f80911223344556677889900aabbccddeeff"/>
@@ -209,7 +209,13 @@
           idempotent="true"
           compensates="post_ledger">
       <description>Compensation for a posted entry when payment later fails.
-        A reversal, not a delete — the original entry stays in the audit trail.</description>
+        A reversal, not a delete — the original entry stays in the audit trail.
+
+        Note that `pay` deliberately has NO outgoing error edge. An error edge
+        would make the failure HANDLED (§5.8), the workflow would continue, and
+        compensation would never run — so the rollback this node exists for
+        would be silently skipped. Letting the failure propagate is what
+        triggers unwinding.</description>
       <inputs>
         <input name="entryId" type="string" value="${post_ledger.entryId}"/>
       </inputs>
@@ -272,7 +278,6 @@
     <edge id="i_aud"   from="pay"               to="audit"             type="control"/>
 
     <edge id="i_comp"  from="post_ledger"       to="reverse_entry"     type="compensation"/>
-    <edge id="i_e1"    from="pay"               to="reverse_entry"     type="error"/>
     <edge id="i_e2"    from="extract_fields"    to="reject"            type="error"/>
   </edges>
 

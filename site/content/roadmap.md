@@ -20,10 +20,10 @@ Stated plainly, because a roadmap that overstates its present is worthless.
 |---|---|
 | Object model and language design | drafted, coherent, not yet reviewed by anyone outside VisML |
 | XSD 1.0 schema | written, compiles, enforces referential integrity |
-| Reference examples (AI, robotics, networking, enterprise) | written, schema-valid, used as fixtures |
+| Reference examples (AI, robotics, networking, enterprise, training) | written, schema-valid, used as fixtures |
 | Governance, licensing, contribution policy | published |
 | Specification chapters | **partly written** — each page states its own status |
-| Reference runtime (Rust) | parser and validator in progress; executor not started |
+| Reference runtime (Rust) | parser, validator **and executor** working — 43 tests |
 | Conformance suite | fixture format defined; corpus incomplete |
 | SDKs beyond Rust | not started |
 
@@ -37,7 +37,7 @@ The gate for calling v1.0 released, and freezing it forever:
 1. **Every normative rule has a conformance fixture.** A rule the suite cannot
    check is a rule implementers will diverge on. No exceptions — this is the
    condition most likely to delay the release, and it should be.
-2. **The reference runtime executes the full model**, not just validation.
+2. ~~The reference runtime executes the full model, not just validation.~~ **Done** — lifecycle, join policies, decisions, loops, retries, compensation and traces are implemented and tested.
 3. **At least one independent implementation** exists and passes Core level. A
    specification validated only by its author is a file format.
 4. **The specification survives an outside read.** Ambiguity reports from people

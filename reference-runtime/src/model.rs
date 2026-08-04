@@ -35,6 +35,7 @@ pub struct Scalar {
 pub struct Resource {
     pub id: String,
     pub kind: String,
+    pub attrs: Vec<(String, String)>,
     pub line: usize,
 }
 
@@ -42,6 +43,7 @@ pub struct Resource {
 pub struct Artifact {
     pub id: String,
     pub kind: String,
+    pub attrs: Vec<(String, String)>,
     pub line: usize,
 }
 
@@ -57,8 +59,10 @@ pub struct Node {
     pub outputs: Vec<Port>,
     pub resource_refs: Vec<Ref>,
     pub artifact_refs: Vec<Ref>,
-    pub has_retry: bool,
-    pub has_guard: bool,
+    pub retry: Option<Retry>,
+    pub guard: Option<String>,
+    pub timeout: Option<Timeout>,
+    pub config: Vec<(String, String)>,
     pub cases: Option<Cases>,
     pub loop_spec: Option<LoopSpec>,
     pub subworkflow: Option<String>,
@@ -72,9 +76,39 @@ pub struct Port {
     pub name: String,
     pub ty: Option<String>,
     pub required: bool,
-    pub has_default: bool,
-    pub has_value: bool,
+    pub default: Option<String>,
+    pub value: Option<String>,
     pub line: usize,
+}
+
+impl Port {
+    pub fn has_value(&self) -> bool {
+        self.value.is_some()
+    }
+    pub fn has_default(&self) -> bool {
+        self.default.is_some()
+    }
+}
+
+/// Retry policy — specification §8.1. Absent means ONE attempt.
+#[derive(Debug, Clone)]
+pub struct Retry {
+    pub max_attempts: u32,
+    pub backoff: String,
+    pub initial_delay: String,
+    pub max_delay: Option<String>,
+    pub multiplier: f64,
+    pub jitter: bool,
+    /// Error classes to retry on. Empty means "retry any failure", which is
+    /// convenient and usually wrong (§8.1.2).
+    pub retry_on: Vec<String>,
+}
+
+/// §8.2 — bounds a SINGLE ATTEMPT, not the node's total lifetime.
+#[derive(Debug, Clone)]
+pub struct Timeout {
+    pub duration: String,
+    pub on_timeout: String,
 }
 
 #[derive(Debug)]
@@ -98,6 +132,10 @@ pub struct LoopSpec {
     pub count: Option<u64>,
     pub max_iterations: Option<u64>,
     pub body: Option<String>,
+    pub var: String,
+    pub index_var: String,
+    pub max_concurrency: u32,
+    pub on_item_failure: String,
     pub line: usize,
 }
 
@@ -142,6 +180,7 @@ impl EdgeType {
 #[derive(Debug)]
 pub struct Edge {
     pub id: Option<String>,
+    pub condition: Option<String>,
     pub from: String,
     pub to: String,
     pub ty: EdgeType,

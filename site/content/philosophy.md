@@ -30,7 +30,8 @@ maintain by hand has already conceded the argument.
 This is also why *round-tripping* is a hard requirement rather than a feature. A
 document generated from a graph must be re-openable as that graph, without loss.
 The moment the round trip is lossy, the code becomes authoritative again and
-everything above collapses.
+everything above collapses. [Visual Authoring](/visual-authoring/) spells out
+what that obliges an editor to do.
 
 ## 2. HarnessXML is the portable machine-readable representation
 

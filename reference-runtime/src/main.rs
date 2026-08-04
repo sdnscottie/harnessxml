@@ -7,10 +7,12 @@
 //! a disagreement about what the specification means can be settled by reading
 //! an implementation instead of by arguing about prose.
 //!
-//! It is explicitly not RuMima. If this and RuMima disagree, the specification
+//! It is explicitly not Rumima. If this and Rumima disagree, the specification
 //! decides, and at most one of them is right.
 
 mod diag;
+mod exec;
+mod expr;
 mod model;
 mod parse;
 mod validate;
@@ -29,6 +31,12 @@ COMMANDS:
     validate    check a document against the specification's rules
     graph       print the resolved execution graph
     explain     per-node scheduling analysis — what each node waits for
+    run         EXECUTE the workflow and print the resulting node states
+
+RUN OPTIONS:
+    --scenario FILE   script node outcomes, so a run is reproducible
+    --trace           print the execution trace as JSON
+    --quiet           print only the final result line
 
 EXIT CODES (specification §14.7):
     0    valid; warnings may have been reported
@@ -97,6 +105,27 @@ fn main() -> ExitCode {
             }
         },
 
+        "run" => match harness {
+            Some(h) => {
+                if let Some(v) = &h.spec_version {
+                    let _ = v;
+                }
+                // §5.1 — a runtime MUST NOT execute a document that fails
+                // validation. Validation is a gate, not advice.
+                validate::validate(&h, &mut diags);
+                if diags.has_errors() {
+                    print!("{}", diags.report(path));
+                    eprintln!("{path}: refusing to execute an invalid document");
+                    return ExitCode::from(1);
+                }
+                run_workflow(&h, &args, path)
+            }
+            None => {
+                print!("{}", diags.report(path));
+                ExitCode::from(1)
+            }
+        },
+
         "explain" => match harness {
             Some(h) => {
                 explain(&h);
@@ -112,6 +141,79 @@ fn main() -> ExitCode {
             eprintln!("harnessxml: unknown command '{other}'\n");
             eprint!("{USAGE}");
             ExitCode::from(2)
+        }
+    }
+}
+
+fn run_workflow(h: &model::Harness, args: &[String], path: &str) -> ExitCode {
+    let flag = |name: &str| args.iter().any(|a| a == name);
+    let opt = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+    };
+
+    let runner = match opt("--scenario") {
+        Some(f) => match std::fs::read_to_string(&f) {
+            Ok(src) => match exec::SimulatedRunner::from_scenario(&src) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("harnessxml: {f}: {e}");
+                    return ExitCode::from(2);
+                }
+            },
+            Err(e) => {
+                eprintln!("harnessxml: cannot read {f}: {e}");
+                return ExitCode::from(2);
+            }
+        },
+        None => exec::SimulatedRunner::default(),
+    };
+
+    let run = exec::Executor::new(h, runner).run();
+
+    if flag("--trace") {
+        println!("{}", run.trace.to_json());
+    } else if !flag("--quiet") {
+        println!("{:<24} FINAL STATE", "NODE");
+        for n in &h.nodes {
+            let s = run
+                .states
+                .get(&n.id)
+                .copied()
+                .unwrap_or(exec::State::Pending);
+            // A node that was never reached stays PENDING at completion. That
+            // is the expected outcome for the branch a decision did not take
+            // (§6.4), not an error.
+            let note = if s == exec::State::Pending {
+                "   (never reached)"
+            } else {
+                ""
+            };
+            println!("{:<24} {}{}", n.id, s.name(), note);
+        }
+        if !run.errors.is_empty() {
+            println!();
+            for (node, msg) in &run.errors {
+                println!("  {node}: {msg}");
+            }
+        }
+        println!();
+    }
+
+    match run.result {
+        exec::RunResult::Succeeded => {
+            println!("{path}: succeeded");
+            ExitCode::SUCCESS
+        }
+        exec::RunResult::Compensated => {
+            println!("{path}: COMPENSATED — a failure propagated and rollback completed");
+            ExitCode::from(1)
+        }
+        exec::RunResult::Failed => {
+            println!("{path}: FAILED");
+            ExitCode::from(1)
         }
     }
 }
@@ -144,10 +246,10 @@ fn print_graph(h: &model::Harness) {
         if !n.idempotent {
             flags.push("NOT-IDEMPOTENT");
         }
-        if n.has_retry {
+        if n.retry.is_some() {
             flags.push("retry");
         }
-        if n.has_guard {
+        if n.guard.is_some() {
             flags.push("guard");
         }
         if n.join_policy != "all" {
@@ -240,7 +342,7 @@ fn explain(h: &model::Harness) {
             }
         }
 
-        if n.has_guard {
+        if n.guard.is_some() {
             println!("  guard: may become SKIPPED without running (a SUCCESSFUL outcome)");
         }
         if !n.idempotent {

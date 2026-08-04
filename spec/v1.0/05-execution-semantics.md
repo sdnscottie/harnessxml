@@ -24,10 +24,10 @@ A runtime **MUST NOT** execute a document that fails validation
 Execution begins by moving the **entry set** to `READY`:
 
 - if `@entry` is present, that single node;
-- otherwise, every node with no incoming `control`, `data` or `dependency` edge.
+- otherwise, every node with **no incoming edge of any type**.
 
-Incoming `error` and `compensation` edges do not count — a node reachable only by
-an error edge is a handler, not a start.
+A node reachable only by an `error` or `compensation` edge is a **handler, not a
+start** — see [§2.5](/spec/v1.0/document-structure/#2-5-entry-points).
 
 ## 5.3 Readiness
 
@@ -60,7 +60,16 @@ toward a join.
 of incoming edges (`HX-2401`, `HX-2402`).
 
 The "at least one satisfied" clause on `all` matters: if *every* incoming edge
-resolved negative, no path reached the node, so it is `SKIPPED` rather than run.
+resolved negative, **no path reached the node**, and it remains `PENDING`
+([§6.4](/spec/v1.0/lifecycle/#6-4-pending-at-completion-is-normal)).
+
+> **Not reached is not the same as skipped.** `SKIPPED` means *reached, and its
+> guard was false* — a terminal **success** whose control successors still run.
+> `PENDING` means *never reached*, so its successors are not reached either.
+> An earlier draft of this section said an all-negative join yielded `SKIPPED`,
+> which contradicted §6.4 and made the untaken branch of every decision look
+> like it had run and succeeded — with its downstream consumers then failing
+> `HX-4101` for a value nobody ever intended to produce.
 
 ### 5.3.2 Cancellation under `any`
 
@@ -71,6 +80,26 @@ A runtime **MUST NOT** cancel a node that is `RUNNING` and declared
 `idempotent="false"` — it must let it finish and then discard the result. A
 half-completed non-idempotent action is exactly the state the format exists to
 avoid: interrupting a payment mid-flight leaves a question nobody can answer.
+
+### 5.3.3 Unreachability propagates
+
+A node that no path will reach makes **its own outgoing edges
+resolved-negative**, recursively.
+
+Without this rule a join downstream of a branch that was not taken waits
+forever: the edge from the untaken branch is neither satisfied nor negative, so
+an `all` join never resolves and the instance deadlocks. A runtime **MUST**
+propagate unreachability so that such a join can resolve on the branch that
+*was* taken.
+
+A node is unreachable when any of the following holds:
+
+- it is named by a `case/@to` and every decision that could route to it has
+  routed elsewhere;
+- every incoming forward edge is resolved-negative;
+- an incoming **data** edge feeding a **required** input with no `default`
+  comes from an unreachable source — the node can never obtain a value it
+  declared it needs.
 
 ## 5.4 Scheduling
 

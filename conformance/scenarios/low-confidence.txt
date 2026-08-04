@@ -1,0 +1,2 @@
+# low confidence -> the human-review branch instead of auto-file
+classify ok confidence=0.72 category=invoice rationale=uncertain

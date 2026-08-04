@@ -454,7 +454,7 @@ fn ports_and_edges(h: &Harness, diags: &mut Diagnostics) {
                 continue;
             }
             let by_edge = fed.contains_key(&(node.id.as_str(), p.name.as_str()));
-            if !by_edge && !p.has_value && !p.has_default {
+            if !by_edge && !p.has_value() && !p.has_default() {
                 diags.push(Diagnostic::error(
                     "HX-2101",
                     p.line,
@@ -464,7 +464,7 @@ fn ports_and_edges(h: &Harness, diags: &mut Diagnostics) {
                     ),
                 ));
             }
-            if by_edge && p.has_value {
+            if by_edge && p.has_value() {
                 diags.push(Diagnostic::error(
                     "HX-2102",
                     p.line,
@@ -659,7 +659,7 @@ fn graph(h: &Harness, diags: &mut Diagnostics) {
 fn policy(h: &Harness, diags: &mut Diagnostics) {
     for n in &h.nodes {
         // HX-3301 — the contradiction the format makes unrepresentable.
-        if !n.idempotent && n.has_retry {
+        if !n.idempotent && n.retry.is_some() {
             diags.push(Diagnostic::error(
                 "HX-3301",
                 n.line,
