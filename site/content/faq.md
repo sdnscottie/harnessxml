@@ -73,16 +73,27 @@ fighting its assumptions.
 An importer from BPMN is on the [roadmap](/roadmap/). Migration paths matter more
 to adoption than features do.
 
-## What's the file extension? And what is `.visml`?
+## What's the file extension? And what are `.visml` and `.rmmx`?
 
 HarnessXML documents use **`.hxml`**, media type `application/harnessxml+xml`.
 Neither affects validity — an implementation must recognise a document from its
 root element and namespace, never from its filename.
 
-`.visml` is VisML's own format, shared across its products including Rumima. It
-carries canvas layout, colours, grouping and editor state that HarnessXML
-deliberately excludes, and it **embeds a complete HarnessXML document** as a
-child element. Export lifts that element out; import wraps it.
+Three names appear around HarnessXML, at three layers:
+
+| name | layer | |
+|---|---|---|
+| **`.hxml`** | **interchange** — HarnessXML, the open specification | crosses tool boundaries |
+| `.visml` | the markup standard used *inside* Rumima documents | vendor format |
+| `.rmmx` | the file a Rumima document is saved as | vendor format |
+
+```
+Rumima Enterprise Studio  →  .rmmx  →  .hxml  →  any conforming runtime  →  execution
+```
+
+A `.rmmx` file contains `.visml` markup, which embeds a complete HarnessXML
+document. Export lifts it out; import wraps it. **Only `.hxml` is ever handed to
+a runtime.**
 
 ## Isn't HarnessXML then just a subset of VisML's format?
 

@@ -164,7 +164,9 @@ and leaks `server: UploadServer`; harnessxml.com sets HSTS/CSP/etc. via
 | Expression language | working — full evaluator (ch.10) |
 | Tests | **43** passing |
 | Conformance corpus | runner works; 12 fixtures + 3 frozen execution traces; corpus incomplete |
-| SDKs beyond Rust | **not started** |
+| Python SDK | **working** — parser/validator/builder, 25 tests, Core conformance |
+| Go SDK | **working** — parser/validator/CLI, Core conformance |
+| SDKs beyond Rust/Python/Go | **not started** |
 | Site | 31 pages, builds clean, link-checked |
 | GCP deploy | scripted, **not yet run** |
 

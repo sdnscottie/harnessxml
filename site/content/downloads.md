@@ -55,25 +55,30 @@ document from its root element and namespace, never from its filename. The
 extension exists so editors, diff tools and operators recognise a workflow at a
 glance.
 
-There are two extensions in this ecosystem, and only one of them is specified here:
+Three names appear around HarnessXML, at three layers. Only `.hxml` crosses the
+boundary between tools:
 
-| extension | format | open? |
+| name | layer | open? |
 |---|---|---|
-| **`.hxml`** | **HarnessXML** — executable workflows, specified here | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language — the shared native format of VisML's products, including Rumima | vendor format |
+| **`.hxml`** | **interchange** — HarnessXML, specified here | **open, vendor-neutral** |
+| `.visml` | markup standard used *inside* Rumima documents | vendor format |
+| `.rmmx` | the file a Rumima document is saved as | vendor format |
 
-A `.visml` document **embeds** a complete HarnessXML document as a child element,
-alongside the canvas layout, colours and editor state that HarnessXML
-deliberately excludes. Export is lifting that element out; import is wrapping it.
-Nothing is translated, so nothing is lost in translation.
+```
+Rumima Enterprise Studio  →  .rmmx  →  .hxml  →  any conforming runtime  →  execution
+```
+
+A `.rmmx` document contains `.visml` markup, which **embeds a complete
+HarnessXML document**. Export lifts that element out; import wraps it. Nothing
+is translated, so nothing is lost in translation.
 
 > **The dependency runs one way only.** HarnessXML must be fully definable,
-> validatable and executable without reference to `.visml` or any other host
-> format. HarnessXML is **not a subset of, profile of, or extension of** the
-> VisML markup language — it is an independent specification that a VisML
-> document happens to contain, exactly as an HTML page may contain an SVG
-> document. **No conforming implementation is ever expected to read `.visml`.**
-> See [§2.9.1](/spec/v1.0/document-structure/#2-9-1-hxml-and-visml-embedding-not-subsetting).
+> validatable and executable without reference to `.visml`, `.rmmx` or any other
+> host format. It is **not a subset of, profile of, or extension of** any of
+> them — it is an independent specification that a host document happens to
+> contain, exactly as an HTML page may contain an SVG document. **No conforming
+> implementation is ever expected to read `.rmmx` or `.visml`.** See
+> [§2.9.1](/spec/v1.0/document-structure/#2-9-1-hxml-visml-and-rmmx-embedding-not-subsetting).
 
 ## Example documents
 
@@ -121,19 +126,25 @@ code and a test behind it.
 
 Language bindings for building, reading and validating documents.
 
-| language | package | status |
-|---|---|---|
-| Rust | `harnessxml` | reference implementation — in progress |
-| Python | `harnessxml` | planned |
-| Go | `gitlab.com/visml/harnessxml-go` | planned |
-| Java | `com.visml:harnessxml` | planned |
-| C# | `HarnessXml` | planned |
-| JavaScript / TypeScript | `@harnessxml/core` | planned |
+| language | package | status | conformance |
+|---|---|---|---|
+| Rust | `harnessxml` (`reference-runtime/`) | **available** — parser, validator **and executor** | Executing |
+| Python | `harnessxml` (`sdk/python/`) | **available** — parser, validator, document builder | Core |
+| Go | `gitlab.com/visml/harnessxml/sdk/go` | **available** — parser, validator, CLI | Core |
+| Java | `com.visml:harnessxml` | planned | — |
+| C# | `HarnessXml` | planned | — |
+| JavaScript / TypeScript | `@harnessxml/core` | planned | — |
 
-> **Planned means not written.** These are listed so the intended surface is
-> public and so nobody duplicates work by accident — not to suggest something
-> exists that you can install today. An SDK appears in this table as *available*
-> only when it passes the [conformance suite](/conformance/).
+> **Planned means not written.** Those rows are listed so the intended surface
+> is public and nobody duplicates work by accident — not to suggest something
+> exists that you can install today.
+>
+> An SDK is marked **available** only when it passes the
+> [conformance suite](/conformance/). All three that are, do: Rust, Python and Go
+> each accept every valid fixture and reject every invalid one **with the same
+> `HX-nnnn` code**. Three independent codebases in three languages reaching
+> identical verdicts is the best evidence available that the specification is
+> precise enough to implement from.
 
 ## Conformance suite
 

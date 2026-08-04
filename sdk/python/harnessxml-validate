@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Thin wrapper so the conformance runner can invoke the Python SDK without
+# needing it installed:  conformance/validate.py --cmd "sdk/python/harnessxml-validate"
+exec env PYTHONPATH="$(cd "$(dirname "$0")" && pwd)" python3 -m harnessxml validate "$@"

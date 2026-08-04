@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harnessxml"
+version = "0.1.0"
+description = "Python SDK for the HarnessXML open specification — executable intelligent system workflows"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "VisML", email = "scottie@agrarobotics.com" }]
+keywords = ["harnessxml", "workflow", "orchestration", "agents", "robotics", "xml"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries",
+]
+# No runtime dependencies, deliberately. A specification that promises its
+# released versions stay reachable forever should not need a dependency tree
+# to read them.
+dependencies = []
+
+[project.urls]
+Homepage = "https://harnessxml.com/"
+Specification = "https://harnessxml.com/spec/v1.0/"
+Repository = "https://gitlab.com/visml/harnessxml"
+
+[project.scripts]
+harnessxml-py = "harnessxml.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["harnessxml*"]

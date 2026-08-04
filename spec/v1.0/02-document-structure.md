@@ -229,40 +229,33 @@ The extension exists so that editors, diff tools and operators can recognise a
 workflow at a glance. `application/xml` and `text/xml` are acceptable fallbacks
 where a server cannot be configured.
 
-### 2.9.1 `.hxml` and `.visml` — embedding, not subsetting
+### 2.9.1 `.hxml`, `.visml` and `.rmmx` — embedding, not subsetting
 
-VisML uses one vendor extension across its products, and this specification
-defines a second, separate one. The relationship between them is **containment**,
-and the direction matters more than anything else in this section.
+Three names appear around HarnessXML, at three different layers. Only one of
+them is this specification.
 
-| extension | format | what it is | open? |
+| name | layer | what it is | open? |
 |---|---|---|---|
-| **`.hxml`** | **HarnessXML** | the specification defined by this document — executable workflows | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language | the shared native format of VisML's products, including Rumima | vendor format |
+| **`.hxml`** | interchange | **HarnessXML** — the specification defined by this document | **open, vendor-neutral** |
+| `.visml` | markup | VisML Markup Language — the markup standard used *inside* Rumima documents | vendor format |
+| `.rmmx` | container | the file a Rumima document is **saved as** | vendor format |
 
-**Only `.hxml` is specified here, and only `.hxml` is an interchange format.**
+They nest:
 
-#### A `.visml` document may embed a HarnessXML document
-
-A VisML document carries what HarnessXML deliberately excludes — canvas layout,
-colours, grouping, editor state, work that does not yet execute — and embeds the
-executable graph as a child element **in the HarnessXML namespace**:
-
-```xml
-<visml xmlns="https://visml.com/schema/1.0" product="rumima">
-  <rumima-document version="1">
-    <canvas><!-- layout, colours, grouping: presentation, not semantics --></canvas>
-
-    <harness xmlns="https://harnessxml.com/spec/1.0"
-             id="document_triage" specVersion="1.0">
-      <!-- a complete, independently valid HarnessXML document -->
-    </harness>
-  </rumima-document>
-</visml>
+```
+.rmmx                          the Rumima document — the file on disk
+  └── .visml markup            the markup standard inside it
+        └── <harness>          a complete HarnessXML document, embedded
 ```
 
-Export is then **lifting the element out**, and import is wrapping it. Nothing is
-translated, so nothing can be lost in translation.
+and export lifts the innermost layer out:
+
+```
+Rumima Enterprise Studio  →  .rmmx  →  .hxml  →  any conforming runtime  →  execution
+```
+
+**Only `.hxml` crosses the boundary.** A runtime is handed the exported
+document and never sees `.rmmx` or `.visml`.
 
 #### The embedded element MUST be a complete HarnessXML document
 
@@ -270,44 +263,41 @@ Not a fragment, not a profile, not a dialect. Serialised on its own it is
 byte-for-byte a valid `.hxml` document that validates against
 [`harnessxml-1.0.xsd`](/schema/v1.0/harnessxml-1.0.xsd).
 
+Export is therefore **lifting the element out**, and import is wrapping it.
+Nothing is translated, so nothing can be lost in translation — which is the
+cheapest possible way to guarantee the round trip.
+
 #### The dependency runs one way only
 
 **This is the rule that keeps HarnessXML open, and it is normative:**
 
 > HarnessXML **MUST** be fully definable, validatable and executable without
-> reference to `.visml` or to any other host format. A conforming implementation
-> **MUST NOT** be required to understand a host format in order to process an
-> embedded HarnessXML document.
+> reference to `.visml`, `.rmmx`, or any other host format. A conforming
+> implementation **MUST NOT** be required to understand a host format in order
+> to process an embedded HarnessXML document.
 
-`.visml` may depend on HarnessXML. HarnessXML must never depend on `.visml`.
+A host may depend on HarnessXML. HarnessXML must never depend on a host.
 
 HarnessXML is therefore **not a subset of**, **not a profile of**, and **not an
-extension of** the VisML markup language. It is an independent specification that
-a VisML document happens to contain — exactly as an HTML page may contain an SVG
-document without SVG becoming a subset of HTML.
+extension of** the VisML markup language. It is an independent specification
+that a host document happens to contain — exactly as an HTML page may contain
+an SVG document without SVG becoming a subset of HTML.
 
 If that direction were reversed — if HarnessXML were *defined as* a restricted
 profile of a vendor format — then implementing it would require understanding
-that vendor's format first, the normative namespace would belong to that vendor,
-and "open and vendor-neutral" would be a claim the format's own definition
-contradicted. The embedding relationship gives VisML everything it wants from
-integration and costs the specification nothing.
+that vendor's format first, the normative namespace would belong to that
+vendor, and "open and vendor-neutral" would be a claim the format's own
+definition contradicted. The embedding relationship gives a vendor everything
+it wants from integration and costs the specification nothing.
 
 #### The same applies to any host
 
-Nothing here is specific to VisML. Any editor, document format or repository may
-embed a HarnessXML document by the same rule: include a complete `<harness>` in
-the HarnessXML namespace, and lift it out unchanged to export. A conforming
-implementation is never expected to read `.visml` — if interoperating required a
-vendor's native format, the open format would have failed at its only job.
-
-> **Note on the extension.** `.visml` was chosen over the shorter `.vxml` because
-> `.vxml` is already in common use for [VoiceXML](https://www.w3.org/TR/voicexml21/),
-> a W3C standard for voice dialogue applications. Since a single extension now
-> carries VisML's whole product surface, the cost of that collision — operating
-> systems and editors with the association already claimed — would have been paid
-> everywhere rather than in one place. `.hxml` and `.visml` have no comparable
-> prior use.
+Nothing here is specific to VisML or Rumima. Any editor, document format or
+repository may embed a HarnessXML document by the same rule: include a complete
+`<harness>` in the HarnessXML namespace, and lift it out unchanged to export. A
+conforming implementation is never expected to read a vendor's native format —
+if interoperating required one, the open format would have failed at its only
+job.
 
 ## 2.10 A minimal document
 

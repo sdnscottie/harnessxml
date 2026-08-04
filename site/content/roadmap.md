@@ -25,7 +25,8 @@ Stated plainly, because a roadmap that overstates its present is worthless.
 | Specification chapters | **partly written** — each page states its own status |
 | Reference runtime (Rust) | parser, validator **and executor** working — 43 tests |
 | Conformance suite | fixture format defined; corpus incomplete |
-| SDKs beyond Rust | not started |
+| Python and Go SDKs | **working** — both pass the conformance suite at Core level |
+| SDKs beyond Rust/Python/Go | not started |
 
 Any page marked **draft** is not normative. Any page marked **planned** has not
 been written at all — it is an outline of intent, listed so the shape is public.
@@ -40,6 +41,12 @@ The gate for calling v1.0 released, and freezing it forever:
 2. ~~The reference runtime executes the full model, not just validation.~~ **Done** — lifecycle, join policies, decisions, loops, retries, compensation and traces are implemented and tested.
 3. **At least one independent implementation** exists and passes Core level. A
    specification validated only by its author is a file format.
+
+   *Partial.* Three implementations now pass the suite — Rust, Python and Go —
+   and reaching identical verdicts across three languages is real evidence the
+   specification is implementable. But all three were written by the same
+   author, so they are **additional** implementations, not **independent** ones.
+   This gate stays open until someone outside VisML implements it.
 4. **The specification survives an outside read.** Ambiguity reports from people
    who did not write it are the most valuable input this project can get, and the
    ones that reliably find the sentences two engineers read differently.

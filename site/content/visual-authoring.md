@@ -84,7 +84,15 @@ below.
 A designer usually needs to store more than the specification defines: layout,
 editor state, work in progress that does not yet execute, comments mid-argument.
 The clean way is a **host document that embeds a complete HarnessXML document**
-as a child element:
+as a child element.
+
+Rumima nests three layers to do this:
+
+```
+.rmmx                          the Rumima document — the file on disk
+  └── .visml markup            the markup standard inside it
+        └── <harness>          a complete HarnessXML document, embedded
+```
 
 ```xml
 <visml xmlns="https://visml.com/schema/1.0" product="rumima">
@@ -99,6 +107,16 @@ as a child element:
 </visml>
 ```
 
+The full path from design to execution:
+
+```
+Rumima Enterprise Studio  →  .rmmx  →  .hxml  →  any conforming runtime  →  execution
+```
+
+**Only `.hxml` crosses the boundary between tools.** The runtime is handed the
+exported document and never sees `.rmmx` or `.visml` — which is exactly what
+makes the runtime replaceable.
+
 Export is then **lifting the element out**; import is wrapping it. Nothing is
 translated, so nothing can be lost in translation — which is the cheapest
 possible way to guarantee the round trip.
@@ -108,14 +126,124 @@ dialect. Serialised on its own it validates against
 [`harnessxml-1.0.xsd`](/schema/v1.0/harnessxml-1.0.xsd).
 
 > **The dependency runs one way only.** HarnessXML must be fully definable,
-> validatable and executable without reference to any host format. It is **not a
-> subset of, profile of, or extension of** `.visml` or anything else — it is an
-> independent specification that a host document happens to contain, exactly as
-> an HTML page may contain an SVG document without SVG becoming a subset of
-> HTML. See [§2.9.1](/spec/v1.0/document-structure/#2-9-1-hxml-and-visml-embedding-not-subsetting).
+> validatable and executable without reference to `.visml`, `.rmmx` or any other
+> host format. It is **not a subset of, profile of, or extension of** any of
+> them — it is an independent specification that a host document happens to
+> contain, exactly as an HTML page may contain an SVG document without SVG
+> becoming a subset of HTML. See
+> [§2.9.1](/spec/v1.0/document-structure/#2-9-1-hxml-visml-and-rmmx-embedding-not-subsetting).
 
 Nothing about this is specific to VisML. Any editor, document format or
 repository may embed a harness by the same rule.
+
+## The dynamic layer, and the line it must not cross
+
+A designer wants more than static structure. Rumima's `.visml` markup is
+**dynamic**: it does finetuning, injects additional weights and attributes, and
+parameterises a workflow, for maximum flexibility in authoring.
+
+That is a genuinely useful capability, and it sits in tension with the thing
+that makes HarnessXML worth having. So the boundary matters more here than
+anywhere else on this page.
+
+### Why the tension is real
+
+HarnessXML's value proposition is that a workflow can be **validated before it
+runs** — every reference resolved, every loop bounded, every non-idempotent step
+identified, before anything touches production. That guarantee holds only if
+**the document you reviewed is the workflow that ran**.
+
+A vendor layer that rewrote core constructs at execution time would destroy it.
+The retry policy in the diff would not be the retry policy that applied; the
+approval threshold reviewed on Tuesday could be something else on Wednesday; a
+validator's verdict would mean nothing.
+
+### Where flexibility belongs
+
+Two places, and the specification supports both:
+
+**1. Resolve at export.** Templating, finetuning and injection happen while
+producing the `.hxml`. The exported document is *concrete* — every value
+already substituted — and is what gets validated, reviewed, signed and
+executed. This is where most flexibility should live, and it costs the
+specification nothing.
+
+**2. Declare the variable parts.** Where a value genuinely must vary per run,
+HarnessXML already has the mechanisms, and they are visible to a reader:
+
+| need | construct |
+|---|---|
+| a per-environment endpoint or credential | `<resource>` + `<credential ref>` — change the resource block, nothing else |
+| a tunable threshold | `<config>` property, which shows up in a diff |
+| a value computed per execution | port `value` with a `${…}` expression |
+| vendor tuning a runtime may ignore | `<extension required="false">` |
+| vendor tuning a runtime must honour or refuse | `<extension required="true">` |
+
+That last pair is the important one. An extension marked `required="false"`
+carries weights, hints and tuning that a runtime may use or ignore, and the node
+still executes either way. Marked `required="true"`, a runtime that does not
+understand it **must refuse to run the document** rather than execute it
+differently — which is how a vendor says "without this, the workflow is wrong"
+without ever producing a silent behavioural difference.
+
+### `.hxml` inside the designer, and finetuning during execution
+
+Rumima also keeps `.hxml` **inside** the tool, and finetunes focused harness
+attributes while a workflow is running. That is the sharpest form of the tension
+above, so it needs the clearest rule.
+
+The reconciliation is that HarnessXML already has the machinery — it just has to
+be used honestly:
+
+**Every adjustment produces a new document revision.** Not an edit applied to a
+running document, but a *new*, complete, valid `.hxml` with its own identity:
+
+```xml
+<metadata>
+  <documentVersion>7</documentVersion>
+  <provenance>
+    <generator name="Rumima Enterprise Studio" version="1.0" vendor="VisML"/>
+    <source uri="rmmx://triage.rmmx" type="visual-graph" digest="sha256:…"/>
+    <signature algorithm="ed25519" keyId="…" value="…"/>
+  </provenance>
+</metadata>
+```
+
+With that, "which workflow actually ran?" still has an answer — a digest, a
+version and a signature — and the execution trace resolves back to it
+([chapter 12](/spec/v1.0/provenance/)). Finetuning becomes a *sequence of
+identified revisions* rather than an untracked mutation, and everything the
+specification promises survives.
+
+Without it, the guarantee is gone. A document edited underneath a running
+instance means the validated artifact and the executed artifact are different
+things, the diff someone reviewed describes neither, and an audit two years
+later has nothing to point at.
+
+So:
+
+| doing this | is | because |
+|---|---|---|
+| adjusting `<config>` or a port `value` between runs, re-exporting, re-validating | **fine** | the new revision is a real document with its own identity |
+| a runtime being handed revision 8 while revision 7's instance finishes | **fine** | each instance names the revision it ran |
+| tuning carried in `<extension required="false">` that a runtime may use or ignore | **fine** | declared, visible, and optional by construction |
+| mutating a running instance's harness attributes in place, with no new identity | **not conformant** | nothing can say afterwards what executed |
+
+The distinction is not bureaucratic. It is the difference between a workflow you
+can attest to and one you can only describe.
+
+### The rule
+
+> Whatever a vendor layer does, **the exported `.hxml` must be complete, valid
+> and executable on its own**. A runtime is handed that document and nothing
+> else. It never reads `.rmmx`, never reads `.visml`, and never needs to.
+
+Injection that resolves *into* the exported document is flexibility. Injection
+that a runtime would have to reach back into a vendor format to resolve is a
+dependency, and the
+[one-way rule](/spec/v1.0/document-structure/#2-9-1-hxml-visml-and-rmmx-embedding-not-subsetting)
+forbids it — not to limit Rumima, but so that a HarnessXML document keeps
+meaning the same thing everywhere.
 
 ## Building your own editor
 
@@ -147,8 +275,9 @@ any particular product, including VisML's.
 ## Rumima Enterprise Studio
 
 **Rumima** is VisML's commercial visual designer for HarnessXML, and the
-flagship authoring environment for the format. It authors in `.visml` and exports
-`.hxml` by the embedding rule above.
+flagship authoring environment for the format. It saves documents as **`.rmmx`**,
+whose contents use the **`.visml`** markup standard, and exports **`.hxml`** by
+the embedding rule above.
 
 It is **one implementation, not the definition**. If Rumima and this
 specification ever disagree, the specification is right and Rumima has a bug —

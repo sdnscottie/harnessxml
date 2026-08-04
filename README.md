@@ -60,7 +60,9 @@ so the labels are deliberately unflattering.
 | Reference **executor** (Rust) | **working** — lifecycle, joins, decisions, loops, retries, compensation, traces |
 | Expression language | working — full evaluator, 11 tests |
 | Conformance corpus | working runner, incomplete corpus |
-| SDKs beyond Rust | not started |
+| Python SDK (`sdk/python/`) | **working** — parser, validator, builder, 25 tests, Core conformance |
+| Go SDK (`sdk/go/`) | **working** — parser, validator, CLI, Core conformance |
+| SDKs beyond Rust/Python/Go | not started |
 
 ## Repository layout
 
@@ -70,6 +72,8 @@ schema/v1.0/            harnessxml-1.0.xsd
 examples/               reference documents, doubling as conformance fixtures
 reference-runtime/      Rust parser + validator + `harnessxml` CLI
 conformance/            the suite third parties run to prove compatibility
+sdk/python/             Python SDK — stdlib only, parser + validator + builder
+sdk/go/                 Go SDK — stdlib only, parser + validator + CLI
 site/                   harnessxml.com — stdlib-only static site generator
 deploy/                 GCP deployment (GCS + Cloud CDN behind the shared LB)
 GOVERNANCE.md           stewardship, HXEP process, compatibility policy
@@ -101,19 +105,24 @@ python3 site/build.py --check --serve
 
 ## File extensions
 
-| | | |
+| name | layer | open? |
 |---|---|---|
-| **`.hxml`** | **HarnessXML** — executable workflows, specified here | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language — the shared native format of VisML's products, including Rumima | vendor format |
+| **`.hxml`** | **interchange** — HarnessXML, specified here | **open, vendor-neutral** |
+| `.visml` | markup standard used *inside* Rumima documents | vendor format |
+| `.rmmx` | the file a Rumima document is saved as | vendor format |
 
-A `.visml` document **embeds** a complete HarnessXML document as a child element,
-alongside the canvas layout and editor state that HarnessXML excludes. Export
-lifts the element out; import wraps it.
+```
+Rumima Enterprise Studio  →  .rmmx  →  .hxml  →  any conforming runtime  →  execution
+```
+
+A `.rmmx` document contains `.visml` markup, which **embeds a complete HarnessXML
+document**. Export lifts the element out; import wraps it. Only `.hxml` crosses
+the boundary between tools.
 
 **The dependency runs one way only.** HarnessXML must be fully definable,
-validatable and executable without reference to `.visml` — it is *not* a subset,
-profile or extension of any vendor format, exactly as SVG is not a subset of HTML
-merely because an HTML page can contain one.
+validatable and executable without reference to `.visml`, `.rmmx` or any other
+host format — it is *not* a subset, profile or extension of any of them, exactly
+as SVG is not a subset of HTML merely because an HTML page can contain one.
 
 ## Openness
 
