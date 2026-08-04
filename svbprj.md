@@ -9,7 +9,7 @@ intelligent system workflows, and **harnessxml.com**, its official public home.
 > wiring-harness format under that reading and was deleted.
 
 - **Domain:** `harnessxml.com` — owned, GCP-hosted alongside visml.com
-- **Repo:** `github.com/sdnscottie/harnessxml` (public)
+- **Repo:** `gitlab.com/visml/harnessxml` (public)
 - **Steward:** VisML · **Flagship designer:** RuMima Enterprise Studio
 - **Status:** v1.0 **draft** — see §Status
 

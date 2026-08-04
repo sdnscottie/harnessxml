@@ -1,0 +1,44 @@
+# Gitleaks configuration for the HarnessXML repository.
+#
+# Copyright 2026 VisML. SPDX-License-Identifier: Apache-2.0
+#
+# This repository deliberately contains strings shaped exactly like real API
+# keys. That is not an accident and not a leak: the specification forbids
+# literal credentials in a document (HX-3501), and the only way to prove a
+# validator enforces that rule is to feed it a document containing one.
+#
+# So the fixtures below are FAKE keys whose entire purpose is to be detected.
+# A secret scanner flagging them is the scanner working correctly.
+#
+# The allowlist is deliberately NARROW — specific paths and specific literal
+# values, not a blanket rule. A future real leak in these same files must still
+# be caught, which a path-only exclusion would prevent.
+
+[extend]
+useDefault = true
+
+[[rules]]
+  # Keep the default Anthropic-key rule, but teach it about our fixtures.
+  id = "anthropic-api-key"
+  description = "Anthropic API key"
+  regex = '''sk-ant-(?:api|sid)[0-9]{2}-[\w\-]{20,}'''
+  keywords = ["sk-ant-"]
+
+  [rules.allowlist]
+    description = "Deliberate HX-3501 test fixtures — fake keys that exist to be rejected"
+    regexTarget = "match"
+    regexes = [
+      # conformance/invalid/credential-literal.hxml — base64 of "BadIdeaThisIsAFakeKeyForTesting"
+      '''sk-ant-api03-QmFkSWRlYVRoaXNJc0FGYWtlS2V5Rm9yVGVzdGluZw''',
+      # reference-runtime/src/main.rs — literal_credential_is_hx_3501 test
+      '''sk-ant-api03-A{20,}''',
+    ]
+
+[allowlist]
+  description = "Repository-wide allowlist"
+  paths = [
+    # The generated site is a build artifact, rebuilt by site/build.py. It is
+    # gitignored, but scanners often walk the working tree anyway.
+    '''site/public/.*''',
+    '''reference-runtime/target/.*''',
+  ]

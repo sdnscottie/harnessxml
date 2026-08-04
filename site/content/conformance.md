@@ -63,7 +63,7 @@ about whether a node ran, was skipped, retried, failed or was compensated.
 ## Running the suite
 
 ```bash
-git clone https://github.com/sdnscottie/harnessxml
+git clone https://gitlab.com/visml/harnessxml
 cd harnessxml
 python3 conformance/validate.py                       # reference validator
 python3 conformance/validate.py --cmd "my-validator"  # your implementation

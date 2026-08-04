@@ -93,7 +93,7 @@ Apache-2.0. Parser, validator and execution model in Rust, plus the `harnessxml`
 CLI.
 
 ```bash
-git clone https://github.com/sdnscottie/harnessxml
+git clone https://gitlab.com/visml/harnessxml
 cd harnessxml/reference-runtime
 cargo build --release
 ```
@@ -115,7 +115,7 @@ Language bindings for building, reading and validating documents.
 |---|---|---|
 | Rust | `harnessxml` | reference implementation — in progress |
 | Python | `harnessxml` | planned |
-| Go | `github.com/sdnscottie/harnessxml-go` | planned |
+| Go | `gitlab.com/visml/harnessxml-go` | planned |
 | Java | `com.visml:harnessxml` | planned |
 | C# | `HarnessXml` | planned |
 | JavaScript / TypeScript | `@harnessxml/core` | planned |
@@ -132,7 +132,7 @@ that must be rejected **with a specified error code**, and execution traces that
 must match.
 
 ```bash
-git clone https://github.com/sdnscottie/harnessxml
+git clone https://gitlab.com/visml/harnessxml
 python3 harnessxml/conformance/validate.py
 ```
 

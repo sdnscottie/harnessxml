@@ -37,7 +37,11 @@ SITE_NAME = "HarnessXML"
 SITE_TAGLINE = "The Open Specification for Executable Intelligent System Workflows"
 STEWARD = "VisML"
 STEWARD_URL = "https://visml.com"
-REPO_URL = "https://github.com/sdnscottie/harnessxml"
+REPO_URL = "https://gitlab.com/visml/harnessxml"
+# GitLab puts project routes under /-/ ; GitHub does not. Getting this wrong
+# gives every page a 404 "Improve this page" link, which is worse than none.
+#   GitLab: /-/edit/main/<path>      GitHub: /edit/main/<path>
+REPO_EDIT_PATH = "/-/edit/main/"
 CURRENT_SPEC = "v1.0"
 SPEC_VERSIONS = ["v1.0"]  # newest last; every released version stays forever
 
@@ -637,7 +641,7 @@ def page_html(page: Page, pages: list[Page], prev: Page | None, nxt: Page | None
     {footer_nav}
     <footer class="page-footer">
       <p>
-        <a href="{REPO_URL}/edit/main/{edit_path}" rel="noopener" target="_blank">Improve this page</a>
+        <a href="{REPO_URL}{REPO_EDIT_PATH}{edit_path}" rel="noopener" target="_blank">Improve this page</a>
         · Specification text under
         <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener" target="_blank">CC BY 4.0</a>
         · Code under

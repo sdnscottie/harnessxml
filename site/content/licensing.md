@@ -102,6 +102,6 @@ thing this project cannot check for you.
 
 ## Files
 
-- [`LICENSE-SPEC`](https://github.com/sdnscottie/harnessxml/blob/main/LICENSE-SPEC) — CC BY 4.0 terms and scope
-- [`LICENSE-CODE`](https://github.com/sdnscottie/harnessxml/blob/main/LICENSE-CODE) — full Apache 2.0 text
+- [`LICENSE-SPEC`](https://gitlab.com/visml/harnessxml/blob/main/LICENSE-SPEC) — CC BY 4.0 terms and scope
+- [`LICENSE-CODE`](https://gitlab.com/visml/harnessxml/blob/main/LICENSE-CODE) — full Apache 2.0 text
 - [Governance](/governance/) — the commitments that surround the licences
