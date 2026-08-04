@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Reference parser and validator for the HarnessXML open specification"
 license = "Apache-2.0"
-repository = "https://github.com/scottsoft/harnessxml"
+repository = "https://github.com/sdnscottie/harnessxml"
 readme = "README.md"
 
 [[bin]]

@@ -37,7 +37,7 @@ SITE_NAME = "HarnessXML"
 SITE_TAGLINE = "The Open Specification for Executable Intelligent System Workflows"
 STEWARD = "VisML"
 STEWARD_URL = "https://visml.com"
-REPO_URL = "https://github.com/scottsoft/harnessxml"
+REPO_URL = "https://github.com/sdnscottie/harnessxml"
 CURRENT_SPEC = "v1.0"
 SPEC_VERSIONS = ["v1.0"]  # newest last; every released version stays forever
 
