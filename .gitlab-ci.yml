@@ -155,11 +155,25 @@ secret_detection:
 # ---------------------------------------------------------------- deploy
 #
 # Publishes harnessxml.com to the GCS bucket behind the shared load balancer.
-# Requires these CI/CD variables (Settings -> CI/CD -> Variables), all masked:
-#   GCP_SA_KEY        service-account JSON with storage + CDN invalidation rights
-#   GCP_PROJECT_ID    agrarobotics-licensing
-# Until they exist this job is manual, so a push never silently fails a pipeline
-# on missing credentials.
+#
+# AUTHENTICATION: Workload Identity Federation. There is NO service-account key
+# anywhere — not in a variable, not in a file, not in this repository. GitLab
+# mints a short-lived OIDC token proving the job runs in visml/harnessxml, GCP
+# trusts that issuer and exchanges it for a short-lived access token.
+#
+# This is not merely preferred here: the organisation enforces
+# constraints/iam.disableServiceAccountKeyCreation, so a JSON key cannot be
+# created at all.
+#
+# The three variables below are IDENTIFIERS, not secrets, which is why none of
+# them are masked:
+#   GCP_PROJECT_ID       agrarobotics-licensing
+#   GCP_SERVICE_ACCOUNT  harnessxml-deploy@…            (least privilege)
+#   GCP_WIF_PROVIDER     projects/…/providers/gitlab
+#
+# The service account can do exactly two things: write objects to
+# gs://harnessxml-web, and invalidate the CDN. It cannot reconfigure the load
+# balancer that also serves visml.com, rumima and both collab hosts.
 
 deploy_site:
   stage: deploy
@@ -167,23 +181,39 @@ deploy_site:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
-      allow_failure: true
   needs: ["site"]
   variables:
     BUCKET: harnessxml-web
     URLMAP: rumima-urlmap
+  id_tokens:
+    GCP_ID_TOKEN:
+      # Must match --allowed-audiences on the OIDC provider.
+      aud: https://gitlab.com
+  before_script:
+    - echo "$GCP_ID_TOKEN" > /tmp/gitlab-oidc.jwt
+    - |
+      cat > /tmp/wif-credentials.json <<JSON
+      {
+        "type": "external_account",
+        "audience": "//iam.googleapis.com/${GCP_WIF_PROVIDER}",
+        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+        "token_url": "https://sts.googleapis.com/v1/token",
+        "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${GCP_SERVICE_ACCOUNT}:generateAccessToken",
+        "credential_source": { "file": "/tmp/gitlab-oidc.jwt" }
+      }
+      JSON
+    - gcloud auth login --cred-file=/tmp/wif-credentials.json --quiet
+    - gcloud config set project "$GCP_PROJECT_ID" --quiet
+    - gcloud auth list
   script:
-    - echo "$GCP_SA_KEY" > /tmp/sa.json
-    - gcloud auth activate-service-account --key-file=/tmp/sa.json
-    - gcloud config set project "$GCP_PROJECT_ID"
     - gcloud storage rsync -r --delete-unmatched-destination-objects site/public "gs://$BUCKET" --cache-control="public, max-age=300"
     - gcloud storage objects update "gs://$BUCKET/assets/**"       --cache-control="public, max-age=86400"
     # A released schema is immutable, so it may be cached for a year.
     - gcloud storage objects update "gs://$BUCKET/schema/**"       --cache-control="public, max-age=31536000, immutable"
     - gcloud storage objects update "gs://$BUCKET/examples-src/**" --cache-control="public, max-age=3600"
     - gcloud compute url-maps invalidate-cdn-cache "$URLMAP" --path="/*" --async
-    - rm -f /tmp/sa.json
   after_script:
+    - rm -f /tmp/gitlab-oidc.jwt /tmp/wif-credentials.json
     - |
       set -e
       sleep 10

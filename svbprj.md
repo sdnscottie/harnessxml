@@ -39,22 +39,54 @@ are: no privileged extension point (Rumima uses the same public mechanism as any
 third party), a reference runtime that is **not** Rumima, and conformance defined
 by a published test suite rather than by agreement with any product.
 
-**File extensions, and the rule that keeps the whole positioning honest:**
+**File extensions — THREE layers, and the rule that keeps the positioning honest:**
 
-| ext | format | open? |
+| name | layer | open? |
 |---|---|---|
-| **`.hxml`** | **HarnessXML** — this specification | **open, vendor-neutral** |
-| `.visml` | VisML Markup Language — shared native format of VisML's products, incl. Rumima | vendor format |
+| **`.hxml`** | **interchange** — HarnessXML, the open specification | **open, vendor-neutral** |
+| `.visml` | the markup standard used *inside* Rumima documents | vendor format |
+| `.rmmx` | the file a Rumima document is **saved as** | vendor format |
 
-A `.visml` document **embeds** a complete `<harness>` as a child element; export
-lifts it out. **The dependency runs one way only** — HarnessXML must be fully
-definable and executable without reference to `.visml`. It is *not* a subset or
-profile of the vendor format, exactly as SVG is not a subset of HTML.
+```
+.rmmx                          the Rumima document — the file on disk
+  └── .visml markup            the markup standard inside it
+        └── <harness>          a complete HarnessXML document, embedded
 
-> `.visml` was chosen over `.vxml` because **`.vxml` already belongs to VoiceXML**
-> (a W3C standard). With one extension carrying VisML's whole product surface,
-> that collision would have been paid everywhere. `.rxml` was the earlier plan,
-> superseded by the one-format-family decision.
+Rumima Enterprise Studio → .rmmx → .hxml → any runtime → execution
+```
+
+**Only `.hxml` crosses the boundary between tools.** A runtime is handed the
+export and never sees `.rmmx` or `.visml` — which is what makes the runtime
+replaceable.
+
+**THE ONE-WAY RULE (normative, spec §2.9.1).** HarnessXML must be fully
+definable, validatable and executable without reference to `.visml`, `.rmmx` or
+any host format. It is *not* a subset, profile or extension of any of them — it
+is an independent specification a host document happens to contain, exactly as
+an HTML page may contain SVG. A host may depend on HarnessXML; HarnessXML must
+never depend on a host. Reverse that and "open and vendor-neutral" becomes a
+claim the format's own definition contradicts.
+
+> `.vxml` was rejected: it already belongs to **VoiceXML** (W3C). `.rxml` was an
+> earlier plan, superseded.
+
+**The dynamic layer.** `.visml` does finetuning and attribute injection at
+authoring time. That is useful and sits in tension with static analysability, so
+the site states where flexibility belongs — resolve at export, or declare it in
+`<config>`, port `value` expressions and `<extension>` — and the line it must
+not cross: a running instance mutated in place with no new document identity is
+**not conformant**, because nothing can say afterwards what actually executed.
+
+## Naming decision — Rumima, not RuMima
+
+Brand casing is **Rumima**. Corrected across 52 occurrences in 17 files.
+
+The VisML feature page is **`visml.com/harnessxml/`**, never `/harness/`:
+"harness" alone is overloaded (wiring, test, safety, climbing), and that
+ambiguity is not hypothetical — it caused a false start on this very project.
+The vendor extension namespace in the training example moved with it. A
+namespace URI is an *identifier*, not a link, so changing one changes what a
+document means: free while nothing depends on it, not free later.
 
 ## Layout
 
@@ -67,8 +99,11 @@ harnessxml/
 ├── GOVERNANCE.md · CONTRIBUTING.md · CODE_OF_CONDUCT.md
 ├── spec/v1.0/                      ·   16 specification chapters (Markdown)
 ├── schema/v1.0/harnessxml-1.0.xsd  ·   normative structural schema
-├── examples/{ai,robotics,networking,enterprise}/
-├── reference-runtime/              ·   Rust parser + validator + `harnessxml` CLI
+├── examples/{ai,robotics,networking,enterprise,training}/
+├── examples/rmmx/                  ·   REAL Rumima maps + screenshots of the live app
+├── reference-runtime/              ·   Rust: parser + validator + EXECUTOR + CLI
+├── sdk/python/                     ·   Python SDK — stdlib only, incl. document builder
+├── sdk/go/                         ·   Go SDK — stdlib only (encoding/xml)
 ├── conformance/                    ·   the suite third parties run
 ├── site/                           ·   build.py (stdlib only) + content + assets
 ├── deploy/deploy_harnessxml.sh     ·   GCP deploy
@@ -86,7 +121,13 @@ python3 site/build.py --check --serve       # build site, verify links, serve :8
 cd reference-runtime && cargo test          # 14 tests
 ./target/release/harnessxml validate ../examples/ai/document-triage.hxml
 ./target/release/harnessxml explain  ../examples/robotics/pick-and-place.hxml
+./target/release/harnessxml run     ../examples/ai/document-triage.hxml --trace
+
+# the SAME conformance suite, against all three implementations
 python3 conformance/validate.py --cmd "reference-runtime/target/release/harnessxml validate"
+python3 conformance/validate.py --cmd "sdk/python/harnessxml-validate"
+cd sdk/go && go build -o /tmp/hx ./cmd/harnessxml && cd ../.. \
+  && python3 conformance/validate.py --cmd "/tmp/hx validate"
 ```
 
 `site/build.py` is **standard library only, no network at build time** — a
@@ -159,27 +200,131 @@ and leaks `server: UploadServer`; harnessxml.com sets HSTS/CSP/etc. via
 |---|---|
 | Object model, XSD, 16 spec chapters | drafted; schema compiles, enforces referential integrity via `xs:key`/`xs:keyref` |
 | 5 reference examples | AI, robotics, networking, enterprise, training — schema-valid, double as fixtures |
-| Reference **validator** (Rust) | working — all layer-1/2 rules, clippy/fmt clean |
-| Reference **executor** (Rust) | **working** — lifecycle, joins, decisions, loops, retries, compensation, JSON traces |
-| Expression language | working — full evaluator (ch.10) |
-| Tests | **43** passing |
-| Conformance corpus | runner works; 12 fixtures + 3 frozen execution traces; corpus incomplete |
-| Python SDK | **working** — parser/validator/builder, 25 tests, Core conformance |
-| Go SDK | **working** — parser/validator/CLI, Core conformance |
+| 2 Rumima `.rmmx` maps + screenshots | built in the REAL app over its REST API, not mock-ups |
+| Reference **validator** (Rust) | working — all layer-1/2 rules |
+| Reference **executor** (Rust) | working — lifecycle, joins, decisions, loops, retries, compensation, JSON traces |
+| Expression language (ch.10) | working — full evaluator |
+| **Python SDK** | working — parser, validator, document builder, CLI, 25 tests |
+| **Go SDK** | working — parser, validator, CLI; `go.mod` has no requires |
+| Rust tests | **43** passing, clippy `-D warnings` + fmt clean |
+| Conformance corpus | 12 fixtures + 3 frozen execution traces; **corpus still incomplete** |
+| Site | 32 pages, link-checked, visml.com house style |
+| CI | GitLab + GitHub both green, 7 jobs each |
 | SDKs beyond Rust/Python/Go | **not started** |
-| Site | 31 pages, builds clean, link-checked |
-| GCP deploy | scripted, **not yet run** |
+| **Independent** implementation | **none** — see below |
 
-## The reference implementation earned its keep immediately
+**THE HEADLINE RESULT.** All three implementations pass the same conformance
+suite with the **same error codes**:
 
-It rejected `examples/networking/config-rollout.hxml` under rule `HX-3004`
-("a loop body must not be reachable by forward edges from outside the loop"). The
-example was right and the **rule was wrong**: a loop body almost always needs a
-loop-invariant input, and `data` edges are how that is bound. `HX-3004` now
-covers `control` and `dependency` edges only, and spec §7.2.6 records why.
+```
+Rust reference   passed 12   failed 0
+Python SDK       passed 12   failed 0
+Go SDK           passed 12   failed 0
+```
 
-That is precisely what a reference implementation is for, and the episode is
-worth keeping: normative prose that sounds airtight fails against real documents.
+Three codebases in three languages reaching identical verdicts is the best
+evidence available that the specification is precise enough to implement from.
+**But the same author wrote all three**, so they are ADDITIONAL implementations,
+not INDEPENDENT ones. The "independent implementation" release gate stays open
+until someone outside VisML implements it. The roadmap says so in those words.
+
+## Building the executor found THREE contradictions in the specification
+
+The strongest argument for a reference implementation, demonstrated three times:
+
+1. **§2.5 and §5.2 contradicted their own next sentence.** "Entry set = every
+   node with no incoming control/data/dependency edge" made an ERROR HANDLER —
+   which has only an incoming error edge — into a START. The executor
+   cheerfully ran a failure handler on a workflow where nothing had failed.
+   Entry set is now "no incoming edge of any type".
+
+2. **§5.3.1 said an all-negative join yields SKIPPED; §6.4 said unreached nodes
+   stay PENDING.** Flatly contradictory. §6.4 is right: SKIPPED means *reached,
+   guard false* and is a SUCCESS whose successors run; PENDING means *never
+   reached*. Conflating them made the untaken branch of every decision report as
+   a success that ran, then fail its consumers with HX-4101 for a value nobody
+   intended to produce.
+
+3. **NEW §5.3.3 — unreachability PROPAGATES.** Nothing said an unreachable
+   source makes its outgoing edges resolved-negative, so a downstream `all` join
+   waited forever on a branch never taken and the instance DEADLOCKED.
+
+Two examples were wrong too: robotics had a dependency edge expressing a
+loop-BACK (deadlock — repetition must be a loop node), and enterprise had
+`reverse_entry` as both an error target and a compensation target, so the error
+edge HANDLED the failure and the compensation the example exists to demonstrate
+never ran.
+
+## CI caught two real bugs
+
+Neither was noise:
+
+- **gitleaks exit 1** — correct detection. The repo contains strings shaped
+  exactly like Anthropic API keys, in the HX-3501 fixtures. They are FAKE and
+  deliberate: the only way to prove a validator enforces "no literal
+  credentials" is to feed it one. `.gitleaks.toml` allowlists them NARROWLY, by
+  literal value, so a real leak in those same files is still caught.
+- **cargo audit exit 1** — a real vulnerability. quick-xml 0.37.5 carried
+  **RUSTSEC-2026-0195**, unbounded namespace allocation in `NsReader` → memory
+  exhaustion DoS. `parse.rs` uses `NsReader`, and a validator whose job is
+  parsing UNTRUSTED documents is the worst place to carry a parser DoS. Upgraded
+  to 0.41.0; handled the `unescape_value` → `normalized_value(XmlVersion)` API
+  change.
+
+## Repos, sites and CI
+
+| | |
+|---|---|
+| source of truth | **gitlab.com/visml/harnessxml** (public) |
+| mirror | **github.com/sdnscottie/harnessxml** (public) |
+| spec site | **harnessxml.com** — GCS bucket `harnessxml-web` + Cloud CDN |
+| vendor page | **visml.com/harnessxml/** — GCS bucket `visml-web`, same shared LB |
+
+> ⚠️ GitLab pipelines fail INSTANTLY with **zero jobs and `yaml_errors: null`**
+> until the account completes **identity verification** (card or phone). That is
+> "never scheduled", not "broken config" — every new GitLab account hits it once.
+> `visml` is verified; pipelines went green immediately after.
+
+> ⚠️ `gh` on this box has TWO accounts. `scottsoft` is a *profile name*; the
+> username is **`scottie-svb`**, and the repo lives under **`sdnscottie`**.
+> Pushing `.github/workflows/**` needs the **`workflow` token scope** —
+> `gh auth refresh -h github.com -s workflow`. Use HTTPS, not SSH: the SSH key
+> here belongs to `sdnscottie` and GitHub refuses one key on two accounts.
+
+## Deploy auth — Workload Identity Federation, no keys
+
+**The org enforces `constraints/iam.disableServiceAccountKeyCreation`**, so a
+service-account JSON key CANNOT be created. That settles the design: GitLab CI
+authenticates by **WIF over OIDC** and no long-lived credential exists anywhere.
+
+OIDC and WIF are two halves of one handshake, not alternatives: GitLab mints a
+short-lived signed JWT proving the job runs in `visml/harnessxml`; GCP's WIF
+trusts that issuer and exchanges it for a short-lived access token.
+
+| piece | value |
+|---|---|
+| pool | `gitlab-pool` (global) |
+| provider | `gitlab` — issuer `https://gitlab.com`, **attribute-condition pins `project_path == 'visml/harnessxml'`** |
+| service account | `harnessxml-deploy@agrarobotics-licensing.iam.gserviceaccount.com` |
+| project number | `96423820656` |
+
+The attribute-condition is the security boundary: without it, ANY GitLab project
+on gitlab.com could federate into this service account.
+
+GitLab CI/CD variables are `GCP_PROJECT_ID`, `GCP_SERVICE_ACCOUNT`,
+`GCP_WIF_PROVIDER` — **none masked, because none are secrets.** They are
+identifiers. Having nothing secret to store is the point.
+
+Least privilege, deliberately: `roles/storage.objectAdmin` scoped to
+**gs://harnessxml-web only** (not the project), plus a **custom role**
+`harnessxmlCdnInvalidator` carrying just `compute.urlMaps.invalidateCache`.
+`roles/compute.loadBalancerAdmin` would have let CI reconfigure the shared load
+balancer that also serves visml.com, rumima and both collab hosts.
+
+**⚠️ INCOMPLETE — needs `gcloud auth login`, then:** the custom role, the two
+role bindings, and the `roles/iam.workloadIdentityUser` binding for
+`principalSet://…/attribute.project_path/visml/harnessxml`. Pool, provider and
+service account already exist.
 
 ## Conventions
 
